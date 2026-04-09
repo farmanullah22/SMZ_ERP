@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMZ - Shop Management System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="fas fa-mobile-alt"></i>
+        </div>
+        <h1>SMZ</h1>
+        <p>Shop Management System</p>
+      </div>
+      <form id="loginForm">
+        <div class="input-group">
+          <label>Username</label>
+          <div class="input-icon">
+            <i class="fas fa-user"></i>
+            <input type="text" id="loginUsername" placeholder="Enter username" required>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Password</label>
+          <div class="input-icon">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="loginPassword" placeholder="Enter password" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <i class="fas fa-sign-in-alt"></i> Sign In
+        </button>
+      </form>
+      <div class="login-footer">
+        <p>Default: admin / admin123</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="appScreen" class="app-container hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i class="fas fa-mobile-alt"></i>
+          <span class="logo-text">SMZ</span>
+        </div>
+        <button class="sidebar-toggle" id="sidebarToggle">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <ul class="nav-list">
+          <li class="nav-item active" data-page="dashboard">
+            <a href="#dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
+          </li>
+          <li class="nav-item" data-page="products">
+            <a href="#products"><i class="fas fa-box"></i><span>Products</span></a>
+          </li>
+          <li class="nav-item" data-page="sales">
+            <a href="#sales"><i class="fas fa-shopping-cart"></i><span>Sales</span></a>
+          </li>
+          <li class="nav-item" data-page="purchases">
+            <a href="#purchases"><i class="fas fa-truck"></i><span>Purchases</span></a>
+          </li>
+          <li class="nav-item" data-page="customers">
+            <a href="#customers"><i class="fas fa-users"></i><span>Customers</span></a>
+          </li>
+          <li class="nav-item" data-page="suppliers">
+            <a href="#suppliers"><i class="fas fa-industry"></i><span>Suppliers</span></a>
+          </li>
+          <li class="nav-item" data-page="stampPapers">
+            <a href="#stampPapers"><i class="fas fa-file-signature"></i><span>Stamp Paper</span></a>
+          </li>
+          <li class="nav-item" data-page="accounts">
+            <a href="#accounts"><i class="fas fa-wallet"></i><span>Accounts</span></a>
+          </li>
+          <li class="nav-item" data-page="reports">
+            <a href="#reports"><i class="fas fa-file-alt"></i><span>Reports</span></a>
+          </li>
+          <li class="nav-item admin-only" data-page="settings">
+            <a href="#settings"><i class="fas fa-cog"></i><span>Settings</span></a>
+          </li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info" id="userInfo">
+          <div class="user-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="user-details">
+            <span class="user-name" id="currentUserName">Admin</span>
+            <span class="user-role" id="currentUserRole">Admin</span>
+          </div>
+        </div>
+        <button class="btn btn-logout" onclick="App.logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-nav">
+        <div class="nav-left">
+          <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="globalSearch" placeholder="Search products, sales...">
+          </div>
+        </div>
+        <div class="nav-right">
+          <button class="theme-toggle" id="themeToggle" title="Toggle Theme">
+            <i class="fas fa-moon" id="themeIcon"></i>
+          </button>
+          <div class="datetime" id="currentDateTime">
+            <i class="fas fa-clock"></i>
+            <span></span>
+          </div>
+        </div>
+      </header>
+
+      <div class="content-area" id="contentArea">
+        <div class="page" id="dashboardPage"></div>
+        <div class="page hidden" id="productsPage"></div>
+        <div class="page hidden" id="salesPage"></div>
+        <div class="page hidden" id="purchasesPage"></div>
+        <div class="page hidden" id="customersPage"></div>
+        <div class="page hidden" id="suppliersPage"></div>
+        <div class="page hidden" id="stampPapersPage"></div>
+        <div class="page hidden" id="accountsPage"></div>
+        <div class="page hidden" id="reportsPage"></div>
+        <div class="page hidden" id="settingsPage"></div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" id="modal"></div>
+  </div>
+  <div class="loading-overlay hidden" id="loadingOverlay">
+    <div class="spinner">
+      <i class="fas fa-spinner fa-spin"></i>
+      <span>Loading...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/products.js"></script>
+  <script src="js/sales.js"></script>
+  <script src="js/purchases.js"></script>
+  <script src="js/customers.js"></script>
+  <script src="js/suppliers.js"></script>
+  <script src="js/stampPapers.js"></script>
+  <script src="js/accounts.js"></script>
+  <script src="js/reports.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

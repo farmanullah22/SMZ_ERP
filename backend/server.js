@@ -1,0 +1,65 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const { initDatabase } = require('./database/db');
+
+const app = express();
+const PORT = 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+const dataDir = process.env.SMZ_DATA_DIR || __dirname;
+const uploadsDir = path.join(dataDir, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/products', require('./routes/products'));
+app.use('/api/sales', require('./routes/sales'));
+app.use('/api/purchases', require('./routes/purchases'));
+app.use('/api/customers', require('./routes/customers'));
+app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/stamp-papers', require('./routes/stampPapers'));
+app.use('/api/reports', require('./routes/reports'));
+app.use('/api/settings', require('./routes/settings'));
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+async function startServer() {
+  try {
+    await initDatabase();
+    console.log('Database initialized successfully');
+    return await new Promise((resolve, reject) => {
+      const server = app.listen(PORT, () => {
+        console.log(`Server running at http://localhost:${PORT}`);
+        console.log(`Open http://localhost:${PORT} in your browser`);
+        resolve(server);
+      });
+      server.on('error', reject);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    throw error;
+  }
+}
+
+if (require.main === module) {
+  startServer().catch(() => process.exit(1));
+}
+
+module.exports = { app, startServer };
