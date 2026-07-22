@@ -2,84 +2,114 @@ const Accounts = {
   async init() { await this.loadPage(); },
 
   async loadPage() {
-    const accounts = await API.accounts.getAll();
-    const transactions = await API.accounts.getTransactions({ limit: 50 });
-    const container = document.getElementById('accountsPage');
+    Modal.loading(true);
+    try {
+      const [accounts, transactions, settings] = await Promise.all([
+        API.accounts.getAll(),
+        API.accounts.getTransactions({ limit: 50 }),
+        API.settings.getAll().catch(() => ({}))
+      ]);
+      Modal.loading(false);
 
-    const cashAccount = accounts.find(a => a.account_type === 'cash');
-    const bankAccounts = accounts.filter(a => a.account_type === 'bank');
-    const totalCash = cashAccount?.current_balance || 0;
-    const totalBank = bankAccounts.reduce((sum, b) => sum + (b.balance || 0), 0);
-    const totalBalance = totalCash + totalBank;
+      const cashAccount = accounts.find(a => a.account_type === 'cash');
+      const bankAccounts = accounts.filter(a => a.account_type === 'bank');
+      const totalCash = cashAccount?.current_balance || 0;
+      const totalBank = bankAccounts.reduce((sum, b) => sum + (b.balance || 0), 0);
+      const totalBalance = totalCash + totalBank;
+      const storeName = settings.store_name || 'SMZ Mobile Zone';
 
-    container.innerHTML = `
-      <div class="page-header">
-        <h1 class="page-title">Accounts / Khata</h1>
-        <div class="page-actions">
-          <button class="btn btn-primary" onclick="Accounts.showAddBankModal()">
-            <i class="fas fa-plus"></i> Add Bank Account
+      const container = document.getElementById('accountsPage');
+
+      container.innerHTML = `
+        <div class="page-header">
+          <h1 class="page-title">Accounts</h1>
+          <div class="page-actions">
+            <button class="btn btn-info btn-sm" onclick="Accounts.exportPDF()">
+              <i class="fas fa-file-pdf"></i> PDF
+            </button>
+            <button class="btn btn-primary" onclick="Accounts.showAddBankModal()">
+              <i class="fas fa-plus"></i> Add Bank Account
+            </button>
+          </div>
+        </div>
+
+        <!-- Store Profile -->
+        <div class="store-profile">
+          <div class="profile-avatar">
+            <i class="fas fa-store"></i>
+          </div>
+          <div class="profile-info">
+            <h2>${storeName}</h2>
+            <p class="profile-meta"><i class="fas fa-wallet"></i> Total Balance: ${Components.formatCurrency(totalBalance)}</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="Accounts.editProfile()">
+            <i class="fas fa-edit"></i> Edit Profile
           </button>
         </div>
-      </div>
 
-      <div class="accounts-summary">
-        <div class="summary-card total">
-          <div class="summary-icon"><i class="fas fa-wallet"></i></div>
-          <div class="summary-info">
-            <span class="summary-label">Total Balance</span>
-            <span class="summary-value currency">${Components.formatCurrency(totalBalance)}</span>
-          </div>
-        </div>
-        <div class="summary-card cash">
-          <div class="summary-icon"><i class="fas fa-money-bill-wave"></i></div>
-          <div class="summary-info">
-            <span class="summary-label">Cash Account</span>
-            <span class="summary-value currency">${Components.formatCurrency(totalCash)}</span>
-          </div>
-        </div>
-        <div class="summary-card bank">
-          <div class="summary-icon"><i class="fas fa-university"></i></div>
-          <div class="summary-info">
-            <span class="summary-label">Bank Accounts</span>
-            <span class="summary-value currency">${Components.formatCurrency(totalBank)}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="accounts-section">
-        <h2 class="section-title"><i class="fas fa-money-bill-wave"></i> Cash Account</h2>
-        ${this.renderCashAccount(cashAccount)}
-      </div>
-
-      <div class="accounts-section">
-        <h2 class="section-title"><i class="fas fa-university"></i> Bank Accounts</h2>
-        <div class="bank-accounts-grid">
-          ${bankAccounts.length === 0 ? `
-            <div class="empty-state">
-              <i class="fas fa-university"></i>
-              <h3>No Bank Accounts</h3>
-              <p>Add a bank account to get started</p>
+        <div class="accounts-summary">
+          <div class="summary-card total">
+            <div class="summary-icon"><i class="fas fa-wallet"></i></div>
+            <div class="summary-info">
+              <span class="summary-label">Total Balance</span>
+              <span class="summary-value currency">${Components.formatCurrency(totalBalance)}</span>
             </div>
-          ` : bankAccounts.map(b => this.renderBankAccount(b)).join('')}
+          </div>
+          <div class="summary-card cash">
+            <div class="summary-icon"><i class="fas fa-money-bill-wave"></i></div>
+            <div class="summary-info">
+              <span class="summary-label">Cash Account</span>
+              <span class="summary-value currency">${Components.formatCurrency(totalCash)}</span>
+            </div>
+          </div>
+          <div class="summary-card bank">
+            <div class="summary-icon"><i class="fas fa-university"></i></div>
+            <div class="summary-info">
+              <span class="summary-label">Bank Accounts</span>
+              <span class="summary-value currency">${Components.formatCurrency(totalBank)}</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="transactions-section">
-        <div class="section-header">
-          <h2 class="section-title"><i class="fas fa-history"></i> Recent Transactions</h2>
-          <button class="btn btn-sm btn-secondary" onclick="Accounts.showAllTransactions()">
-            View All
-          </button>
+        <div class="accounts-section">
+          <h2 class="section-title"><i class="fas fa-money-bill-wave"></i> Cash Account</h2>
+          ${this.renderCashAccount(cashAccount)}
         </div>
-        ${this.renderTransactions(transactions)}
-      </div>`;
 
-    this.bindAccountEvents();
+        <div class="accounts-section">
+          <div class="section-header">
+            <h2 class="section-title"><i class="fas fa-university"></i> Bank Accounts</h2>
+          </div>
+          <div class="bank-accounts-grid">
+            ${bankAccounts.length === 0 ? `
+              <div class="empty-state">
+                <i class="fas fa-university"></i>
+                <h3>No Bank Accounts</h3>
+                <p>Add a bank account to get started</p>
+              </div>
+            ` : bankAccounts.map(b => this.renderBankAccount(b)).join('')}
+          </div>
+        </div>
+
+        <div class="transactions-section">
+          <div class="section-header">
+            <h2 class="section-title"><i class="fas fa-history"></i> Recent Transactions</h2>
+            <button class="btn btn-sm btn-secondary" onclick="Accounts.showAllTransactions()">
+              View All
+            </button>
+          </div>
+          ${this.renderTransactions(transactions)}
+        </div>`;
+
+      this.bindAccountEvents();
+    } catch (error) {
+      Modal.loading(false);
+      Toast.error('Failed to load accounts');
+    }
   },
 
   renderCashAccount(account) {
     if (!account) return '<p class="text-muted">Cash account not found</p>';
-    
     return `
       <div class="account-card-main cash">
         <div class="account-header">
@@ -87,6 +117,11 @@ const Accounts = {
           <div class="account-info">
             <h3>${account.name}</h3>
             <span class="account-type">Cash Account</span>
+          </div>
+          <div class="account-menu">
+            <button class="action-btn" onclick="Accounts.editCashAccount(${account.id})" title="Edit">
+              <i class="fas fa-edit"></i>
+            </button>
           </div>
         </div>
         <div class="account-balance-display">
@@ -124,8 +159,11 @@ const Accounts = {
             <span class="account-type">${account.account_number || 'Bank Account'}</span>
           </div>
           <div class="account-menu">
-            <button class="action-btn" onclick="Accounts.showBankMenu(${account.id})">
-              <i class="fas fa-ellipsis-v"></i>
+            <button class="action-btn" onclick="Accounts.showEditBankModal(${account.id})" title="Edit">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="action-btn" onclick="Accounts.deleteBank(${account.id})" title="Delete" style="color: rgba(255,255,255,0.7);">
+              <i class="fas fa-trash"></i>
             </button>
           </div>
         </div>
@@ -146,6 +184,10 @@ const Accounts = {
             <i class="fas fa-exchange-alt"></i>
             <span>Transfer</span>
           </button>
+          <button class="action-btn-main statement" onclick="Accounts.showAccountStatement('bank', ${account.id})">
+            <i class="fas fa-file-invoice"></i>
+            <span>Statement</span>
+          </button>
         </div>
       </div>`;
   },
@@ -165,7 +207,7 @@ const Accounts = {
         ${transactions.slice(0, 20).map(t => `
           <div class="transaction-item">
             <div class="transaction-icon ${t.type}">
-              <i class="fas fa-${t.type === 'credit' ? 'arrow-down' : 'arrow-up'}"></i>
+              <i class="fas fa-${t.type === 'credit' ? 'arrow-down' : t.type === 'debit' ? 'arrow-up' : 'exchange-alt'}"></i>
             </div>
             <div class="transaction-details">
               <span class="transaction-desc">${t.description || t.category}</span>
@@ -174,7 +216,7 @@ const Accounts = {
               </span>
             </div>
             <div class="transaction-amount ${t.type}">
-              ${t.type === 'credit' ? '+' : '-'}${Components.formatCurrency(t.amount)}
+              ${t.type === 'credit' ? '+' : t.type === 'debit' ? '-' : ''}${Components.formatCurrency(t.amount)}
             </div>
           </div>`).join('')}
       </div>`;
@@ -187,6 +229,70 @@ const Accounts = {
         setTimeout(() => this.classList.remove('clicked'), 200);
       });
     });
+  },
+
+  editProfile() {
+    Modal.show(`
+      <form id="profileForm">
+        <div class="input-group"><label>Store Name</label><input type="text" name="store_name" id="profileStoreName" placeholder="Store name"></div>
+        <div class="input-group"><label>Currency</label><input type="text" name="currency" id="profileCurrency" placeholder="PKR" value="PKR"></div>
+      </form>`, {
+      title: 'Edit Store Profile',
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.saveProfile()"><i class="fas fa-save"></i> Save</button>`,
+      onOpen: async () => {
+        try {
+          const settings = await API.settings.getAll();
+          document.getElementById('profileStoreName').value = settings.store_name || 'SMZ Mobile Zone';
+        } catch {}
+      }
+    });
+  },
+
+  async saveProfile() {
+    const name = document.getElementById('profileStoreName').value.trim();
+    if (!name) { Toast.warning('Store name is required'); return; }
+    try {
+      Modal.loading(true);
+      await API.settings.update('store_name', name);
+      Modal.loading(false);
+      Modal.hide();
+      Toast.success('Profile updated');
+      await this.loadPage();
+    } catch (error) {
+      Modal.loading(false);
+      Toast.error(error.message);
+    }
+  },
+
+  editCashAccount(id) {
+    Modal.show(`
+      <form id="editCashForm">
+        <div class="input-group"><label>Account Name</label><input type="text" name="name" id="cashName" placeholder="Cash account name"></div>
+        <div class="input-group"><label>Description</label><input type="text" name="description" id="cashDesc" placeholder="Description"></div>
+      </form>`, {
+      title: 'Edit Cash Account',
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.saveCashAccount(${id})"><i class="fas fa-save"></i> Save</button>`,
+      onOpen: async () => {
+        const accounts = await API.accounts.getAll();
+        const acct = accounts.find(a => a.id === id && a.account_type === 'cash');
+        if (acct) {
+          document.getElementById('cashName').value = acct.name || 'Main Cash';
+          document.getElementById('cashDesc').value = acct.description || '';
+        }
+      }
+    });
+  },
+
+  async saveCashAccount(id) {
+    const name = document.getElementById('cashName').value.trim() || 'Main Cash';
+    try {
+      Modal.loading(true);
+      await API.settings.update('cash_name', name);
+      Modal.loading(false);
+      Modal.hide();
+      Toast.success('Cash account updated');
+      await this.loadPage();
+    } catch (error) { Modal.loading(false); Toast.error(error.message); }
   },
 
   showAddBankModal() {
@@ -207,12 +313,7 @@ const Accounts = {
     const fd = new FormData(form);
     const data = Object.fromEntries(fd);
     data.balance = parseFloat(data.balance) || 0;
-
-    if (!data.name) {
-      Toast.warning('Please enter bank name');
-      return;
-    }
-
+    if (!data.name) { Toast.warning('Please enter bank name'); return; }
     try {
       Modal.loading(true);
       await API.accounts.createBank(data);
@@ -220,15 +321,11 @@ const Accounts = {
       Modal.hide();
       Toast.success('Bank account added successfully');
       await this.loadPage();
-    } catch (error) {
-      Modal.loading(false);
-      Toast.error(error.message);
-    }
+    } catch (error) { Modal.loading(false); Toast.error(error.message); }
   },
 
   showDepositModal(type, id) {
     const typeName = type === 'cash' ? 'Cash Account' : 'Bank Account';
-    
     Modal.show(`
       <div class="transaction-form">
         <div class="form-header deposit">
@@ -260,17 +357,8 @@ const Accounts = {
     const amount = parseFloat(form.amount.value);
     const profit = form.profit.value === '' ? null : parseFloat(form.profit.value);
     const description = form.description.value;
-
-    if (!amount || amount <= 0) {
-      Toast.warning('Please enter a valid amount');
-      return;
-    }
-
-    if (profit !== null && Number.isNaN(profit)) {
-      Toast.warning('Please enter a valid profit amount');
-      return;
-    }
-
+    if (!amount || amount <= 0) { Toast.warning('Please enter a valid amount'); return; }
+    if (profit !== null && Number.isNaN(profit)) { Toast.warning('Please enter a valid profit amount'); return; }
     try {
       Modal.loading(true);
       await API.accounts.deposit({ account_type: type, account_id: id, amount, profit, description, payment_method: 'deposit' });
@@ -278,15 +366,11 @@ const Accounts = {
       Modal.hide();
       Toast.success(`PKR ${amount.toLocaleString()} deposited successfully`);
       await this.loadPage();
-    } catch (error) {
-      Modal.loading(false);
-      Toast.error(error.message);
-    }
+    } catch (error) { Modal.loading(false); Toast.error(error.message); }
   },
 
   showWithdrawModal(type, id) {
     const typeName = type === 'cash' ? 'Cash Account' : 'Bank Account';
-    
     Modal.show(`
       <div class="transaction-form">
         <div class="form-header withdraw">
@@ -318,17 +402,8 @@ const Accounts = {
     const amount = parseFloat(form.amount.value);
     const profit = form.profit.value === '' ? null : parseFloat(form.profit.value);
     const description = form.description.value;
-
-    if (!amount || amount <= 0) {
-      Toast.warning('Please enter a valid amount');
-      return;
-    }
-
-    if (profit !== null && Number.isNaN(profit)) {
-      Toast.warning('Please enter a valid profit amount');
-      return;
-    }
-
+    if (!amount || amount <= 0) { Toast.warning('Please enter a valid amount'); return; }
+    if (profit !== null && Number.isNaN(profit)) { Toast.warning('Please enter a valid profit amount'); return; }
     try {
       Modal.loading(true);
       await API.accounts.withdraw({ account_type: type, account_id: id, amount, profit, description, payment_method: 'withdrawal' });
@@ -336,13 +411,13 @@ const Accounts = {
       Modal.hide();
       Toast.success(`PKR ${amount.toLocaleString()} withdrawn successfully`);
       await this.loadPage();
-    } catch (error) {
-      Modal.loading(false);
-      Toast.error(error.message);
-    }
+    } catch (error) { Modal.loading(false); Toast.error(error.message); }
   },
 
-  showTransferModal(fromType, fromId) {
+  async showTransferModal(fromType, fromId) {
+    const accounts = await API.accounts.getAll();
+    const bankAccounts = accounts.filter(a => a.account_type === 'bank');
+
     Modal.show(`
       <div class="transaction-form">
         <div class="form-header transfer">
@@ -356,9 +431,16 @@ const Accounts = {
           </div>
           <div class="input-group">
             <label>To Account *</label>
-            <select name="to_type" id="transferToType">
+            <select name="to_type" id="transferToType" onchange="Accounts.onTransferTypeChange('${fromType}')">
               <option value="cash" ${fromType === 'bank' ? 'selected' : ''}>Cash Account</option>
               <option value="bank" ${fromType === 'cash' ? 'selected' : ''}>Bank Account</option>
+            </select>
+          </div>
+          <div class="input-group" id="transferBankSelect" style="${fromType === 'cash' ? '' : 'display:none;'}">
+            <label>Select Bank Account *</label>
+            <select id="transferBankAccount">
+              <option value="">-- Select Bank --</option>
+              ${bankAccounts.map(b => `<option value="${b.id}">${b.name} (${Components.formatCurrency(b.balance || 0)})</option>`).join('')}
             </select>
           </div>
           <div class="input-group">
@@ -376,45 +458,37 @@ const Accounts = {
     });
   },
 
+  onTransferTypeChange(fromType) {
+    const toType = document.getElementById('transferToType').value;
+    document.getElementById('transferBankSelect').style.display = (toType === 'bank') ? '' : 'none';
+  },
+
   async transfer(fromType, fromId) {
-    const form = document.getElementById('transferForm');
-    const toType = form.toType.value;
-    const amount = parseFloat(form.amount.value);
-    const description = form.description.value;
+    const toType = document.getElementById('transferToType').value;
+    const amount = parseFloat(document.querySelector('#transferForm input[name="amount"]').value);
+    const description = document.querySelector('#transferForm input[name="description"]').value;
+    let toId = 1;
 
-    if (!amount || amount <= 0) {
-      Toast.warning('Please enter a valid amount');
-      return;
+    if (toType === 'bank') {
+      toId = parseInt(document.getElementById('transferBankAccount').value);
+      if (!toId) { Toast.warning('Please select a bank account'); return; }
     }
 
-    if (fromType === toType) {
-      Toast.warning('Cannot transfer to the same account type');
-      return;
-    }
+    if (!amount || amount <= 0) { Toast.warning('Please enter a valid amount'); return; }
+    if (fromType === toType) { Toast.warning('Cannot transfer to the same account type'); return; }
 
     try {
       Modal.loading(true);
-      await API.accounts.transfer({ 
-        from_type: fromType, 
-        from_id: fromId, 
-        to_type: toType, 
-        to_id: 1, 
-        amount, 
-        description 
-      });
+      await API.accounts.transfer({ from_type: fromType, from_id: fromId, to_type: toType, to_id: toId, amount, description });
       Modal.loading(false);
       Modal.hide();
       Toast.success(`PKR ${amount.toLocaleString()} transferred successfully`);
       await this.loadPage();
-    } catch (error) {
-      Modal.loading(false);
-      Toast.error(error.message);
-    }
+    } catch (error) { Modal.loading(false); Toast.error(error.message); }
   },
 
   async showAllTransactions() {
     const transactions = await API.accounts.getTransactions({ limit: 100 });
-    
     Modal.show(`
       <div class="transactions-modal">
         <h3>All Transactions</h3>
@@ -423,7 +497,7 @@ const Accounts = {
             ${transactions.map(t => `
               <div class="transaction-item">
                 <div class="transaction-icon ${t.type}">
-                  <i class="fas fa-${t.type === 'credit' ? 'arrow-down' : 'arrow-up'}"></i>
+                  <i class="fas fa-${t.type === 'credit' ? 'arrow-down' : t.type === 'debit' ? 'arrow-up' : 'exchange-alt'}"></i>
                 </div>
                 <div class="transaction-details">
                   <span class="transaction-desc">${t.description || t.category}</span>
@@ -432,22 +506,21 @@ const Accounts = {
                   </span>
                 </div>
                 <div class="transaction-amount ${t.type}">
-                  ${t.type === 'credit' ? '+' : '-'}${Components.formatCurrency(t.amount)}
+                  ${t.type === 'credit' ? '+' : t.type === 'debit' ? '-' : ''}${Components.formatCurrency(t.amount)}
                 </div>
               </div>`).join('')}
           </div>
         `}
       </div>`, {
       title: 'Transaction History',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Close</button>`
+      footer: `<button class="btn btn-info btn-sm" onclick="Accounts.exportTransactionsPDF(); Modal.hide();"><i class="fas fa-file-pdf"></i> Export PDF</button><button class="btn btn-secondary" onclick="Modal.hide()">Close</button>`
     });
   },
 
   async showAccountStatement(type, id) {
     const transactions = await API.accounts.getTransactions({ account_type: type, limit: 100 });
-    
     const accountName = type === 'cash' ? 'Cash Account' : 'Bank Account';
-    
+
     Modal.show(`
       <div class="statement-modal">
         <div class="statement-header">
@@ -461,7 +534,7 @@ const Accounts = {
                 <div class="statement-date">${Components.formatDate(t.created_at)}</div>
                 <div class="statement-desc">${t.description || t.category}</div>
                 <div class="statement-amount ${t.type}">
-                  ${t.type === 'credit' ? '+' : '-'}${Components.formatCurrency(t.amount)}
+                  ${t.type === 'credit' ? '+' : t.type === 'debit' ? '-' : ''}${Components.formatCurrency(t.amount)}
                 </div>
               </div>`).join('')}
           </div>
@@ -472,69 +545,103 @@ const Accounts = {
     });
   },
 
-  showBankMenu(id) {
-    Modal.confirm('What would you like to do with this account?', async () => {
-      await Accounts.showEditBankModal(id);
-    }, { 
-      title: 'Bank Account Options', 
-      confirmText: 'Edit Account',
-      type: 'primary'
-    });
-  },
-
-  async showEditBankModal(id) {
-    const accounts = await API.accounts.getAll();
-    const account = accounts.find(a => a.id === id && a.account_type === 'bank');
-    
-    if (!account) {
-      Toast.error('Account not found');
-      return;
-    }
-
+  showEditBankModal(id) {
     Modal.show(`
       <form id="editBankForm" class="form-grid">
-        <div class="input-group"><label>Bank Name *</label><input type="text" name="name" required value="${account.name}"></div>
-        <div class="input-group"><label>Account Number</label><input type="text" name="account_number" value="${account.account_number || ''}"></div>
-        <div class="input-group"><label>Description</label><input type="text" name="description" value="${account.description || ''}"></div>
+        <div class="input-group"><label>Bank Name *</label><input type="text" name="name" id="editBankName" required></div>
+        <div class="input-group"><label>Account Number</label><input type="text" name="account_number" id="editBankNumber"></div>
+        <div class="input-group"><label>Description</label><input type="text" name="description" id="editBankDesc"></div>
       </form>
       <div class="mt-4" style="border-top: 1px solid var(--border-color); padding-top: 16px;">
         <button class="btn btn-danger" onclick="Accounts.deleteBank(${id})"><i class="fas fa-trash"></i> Delete Account</button>
       </div>`, {
       title: 'Edit Bank Account',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.updateBank(${id})"><i class="fas fa-save"></i> Update</button>`
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.updateBank(${id})"><i class="fas fa-save"></i> Update</button>`,
+      onOpen: async () => {
+        const accounts = await API.accounts.getAll();
+        const account = accounts.find(a => a.id === id && a.account_type === 'bank');
+        if (account) {
+          document.getElementById('editBankName').value = account.name || '';
+          document.getElementById('editBankNumber').value = account.account_number || '';
+          document.getElementById('editBankDesc').value = account.description || '';
+        }
+      }
     });
   },
 
   async updateBank(id) {
-    const form = document.getElementById('editBankForm');
-    const fd = new FormData(form);
-    const data = Object.fromEntries(fd);
-
+    const name = document.getElementById('editBankName').value.trim();
+    const account_number = document.getElementById('editBankNumber').value.trim();
+    const description = document.getElementById('editBankDesc').value.trim();
+    if (!name) { Toast.warning('Bank name is required'); return; }
     try {
       Modal.loading(true);
-      await API.accounts.updateBank(id, data);
+      await API.accounts.updateBank(id, { name, account_number, description });
       Modal.loading(false);
       Modal.hide();
       Toast.success('Bank account updated');
       await this.loadPage();
-    } catch (error) {
-      Modal.loading(false);
-      Toast.error(error.message);
-    }
+    } catch (error) { Modal.loading(false); Toast.error(error.message); }
   },
 
   async deleteBank(id) {
+    Modal.confirm('Delete this bank account? All associated data will remain.', async () => {
+      try {
+        Modal.loading(true);
+        await API.accounts.deleteBank(id);
+        Modal.loading(false);
+        Modal.hide();
+        Toast.success('Bank account deleted');
+        await this.loadPage();
+      } catch (error) { Modal.loading(false); Toast.error(error.message); }
+    }, { title: 'Delete Account', type: 'danger' });
+  },
+
+  async exportPDF() {
     try {
-      Modal.loading(true);
-      await API.accounts.deleteBank(id);
-      Modal.loading(false);
-      Modal.hide();
-      Toast.success('Bank account deleted');
-      await this.loadPage();
-    } catch (error) {
-      Modal.loading(false);
-      Toast.error(error.message);
-    }
+      const transactions = await API.accounts.getTransactions({ limit: 100 });
+      if (!transactions.length) { Toast.warning('No data to export'); return; }
+      const ok = Components.exportPDF(
+        'SMZ - Accounts Report',
+        ['Date', 'Account', 'Type', 'Amount', 'Profit', 'Description'],
+        transactions.map(t => {
+          const typeText = t.type === 'credit' ? 'Deposit' : t.type === 'debit' ? 'Withdraw' : 'Transfer';
+          return [
+            Components.formatDateTime(t.created_at),
+            t.account_type === 'cash' ? 'Cash Account' : 'Bank Account',
+            typeText,
+            Components.formatCurrency(t.amount),
+            t.profit === null || t.profit === undefined ? '-' : Components.formatCurrency(t.profit),
+            t.description || t.category || '-'
+          ];
+        }),
+        'smz-accounts'
+      );
+      if (ok) Toast.success('PDF exported successfully');
+      else Toast.error('Failed to export PDF');
+    } catch (e) { Toast.error('Failed to export PDF'); }
+  },
+
+  async exportTransactionsPDF() {
+    const transactions = await API.accounts.getTransactions({ limit: 100 });
+    if (!transactions.length) { Toast.warning('No transactions to export'); return; }
+    const ok = Components.exportPDF(
+      'SMZ - All Transactions',
+      ['Date', 'Account', 'Type', 'Amount', 'Description'],
+      transactions.map(t => {
+        const typeText = t.type === 'credit' ? 'Deposit' : t.type === 'debit' ? 'Withdraw' : 'Transfer';
+        return [
+          Components.formatDateTime(t.created_at),
+          t.account_type === 'cash' ? 'Cash Account' : 'Bank Account',
+          typeText,
+          Components.formatCurrency(t.amount),
+          t.description || t.category || '-'
+        ];
+      }),
+      'smz-transactions'
+    );
+    if (ok) Toast.success('PDF exported');
+    else Toast.error('Failed to export PDF');
   }
 };
 

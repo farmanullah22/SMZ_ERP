@@ -1,6 +1,8 @@
 const Dashboard = {
   salesChart: null,
   profitChart: null,
+  donutChart: null,
+  pieChart: null,
   currentPeriod: 'monthly',
 
   async init() {
@@ -13,13 +15,33 @@ const Dashboard = {
 
   async loadStats() {
     try {
-      const stats = await API.sales.getStats();
+      const [stats, accounts, stampPapers, expenses] = await Promise.all([
+        API.sales.getStats(),
+        API.accounts.getAll().catch(() => []),
+        API.stampPapers.getAll().catch(() => []),
+        API.expenses.getAll({}).catch(() => ({ expenses: [], summary: { total: 0 } }))
+      ]);
+
+      const totalCash = accounts.filter(a => a.account_type === 'cash').reduce((s, a) => s + (a.current_balance || 0), 0);
+      const totalBank = accounts.filter(a => a.account_type === 'bank').reduce((s, a) => s + (a.balance || 0), 0);
+      const totalBalance = totalCash + totalBank;
+
+      const stampTotal = stampPapers.reduce((s, p) => s + (p.price || 0), 0);
+      const stampProfit = stampPapers.reduce((s, p) => s + (p.profit || 0), 0);
+
+      const expenseList = expenses.expenses || expenses;
+      const totalExpensesOp = expenseList.reduce ? expenseList.reduce((s, e) => s + (e.amount || 0), 0) : (expenses.summary?.total || 0);
+      const expenseCount = expenseList.length || expenses.summary?.count || 0;
+
       const container = document.getElementById('dashboardPage');
       
       container.innerHTML = `
         <div class="page-header">
           <h1 class="page-title">Dashboard</h1>
           <div class="page-actions">
+            <button class="btn btn-primary" onclick="App.navigateTo('analytics')">
+              <i class="fas fa-chart-bar"></i> View Analytics
+            </button>
             <button class="btn btn-secondary" onclick="Dashboard.refresh()">
               <i class="fas fa-sync-alt"></i> Refresh
             </button>
@@ -29,8 +51,15 @@ const Dashboard = {
         <div class="stats-grid">
           ${Components.statCard('shopping-cart', 'Total Sales', Components.formatCurrency(stats.totalSales), `Today: ${Components.formatCurrency(stats.todaySales)}`, 'primary')}
           ${Components.statCard('chart-line', 'Total Profit', Components.formatCurrency(stats.totalProfit), `This Month: ${Components.formatCurrency(stats.monthProfit)}`, 'success')}
-          ${Components.statCard('truck', 'Total Expenses', Components.formatCurrency(stats.totalExpenses), 'Purchases & Costs', 'warning')}
-          ${Components.statCard('boxes', 'Services Value', Components.formatCurrency(stats.inventoryValue), `${stats.productCount} Items`, 'info')}
+          ${Components.statCard('wallet', 'Cash in Hand', Components.formatCurrency(totalCash), `Bank: ${Components.formatCurrency(totalBank)}`, 'info')}
+          ${Components.statCard('truck', 'Purchases', Components.formatCurrency(stats.totalExpenses), `${stats.productCount} Products`, 'warning')}
+        </div>
+
+        <div class="stats-grid">
+          ${Components.statCard('file-signature', 'Stamp Papers', Components.formatCurrency(stampTotal), `Profit: ${Components.formatCurrency(stampProfit)}`, 'secondary')}
+          ${Components.statCard('receipt', 'Op. Expenses', Components.formatCurrency(totalExpensesOp), `${expenseCount} Entries`, 'danger')}
+          ${Components.statCard('boxes', 'Stock Value', Components.formatCurrency(stats.inventoryValue), `${stats.productCount} Items`, 'info')}
+          ${Components.statCard('balance-scale', 'Net Balance', Components.formatCurrency(totalBalance), 'Cash + Bank', 'primary')}
         </div>
 
         <div class="charts-grid">
@@ -50,6 +79,18 @@ const Dashboard = {
               <h3 class="chart-title">Profit & Loss</h3>
             </div>
             <div class="chart-container"><canvas id="profitChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title">Sales by Category</h3>
+            </div>
+            <div class="chart-container"><canvas id="donutChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title">Payment Methods</h3>
+            </div>
+            <div class="chart-container"><canvas id="pieChart"></canvas></div>
           </div>
         </div>
 
@@ -97,8 +138,71 @@ const Dashboard = {
         data: { labels, datasets: [{ label: 'Profit', data: profitData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }] },
         options: chartOptions
       });
+
+      await this.loadDonutPieCharts();
     } catch (error) {
       console.error('Charts error:', error);
+    }
+  },
+
+  async loadDonutPieCharts() {
+    try {
+      const params = { period: this.currentPeriod };
+      const data = await API.analytics.getData(params);
+
+      const donutColors = ['#f43f5e', '#fb923c', '#fbbf24', '#22d3ee', '#a78bfa', '#34d399', '#f472b6', '#f97316'];
+      const pieColors   = ['#06b6d4', '#f97316', '#8b5cf6', '#10b981', '#ef4444', '#eab308', '#3b82f6', '#ec4899'];
+
+      if (this.donutChart) this.donutChart.destroy();
+      if (this.pieChart) this.pieChart.destroy();
+
+      const catLabels = data.salesByCategory.map(d => d.label);
+      const catValues = data.salesByCategory.map(d => d.value);
+      const catFillColors = catLabels.map((_, i) => donutColors[i % donutColors.length]);
+      const catBorderColors = catLabels.map((_, i) => {
+        const c = donutColors[i % donutColors.length];
+        return c.replace(')', ',0.6)').replace('rgb', 'rgba');
+      });
+
+      this.donutChart = new Chart(document.getElementById('donutChart'), {
+        type: 'doughnut',
+        data: { labels: catLabels, datasets: [{ data: catValues, backgroundColor: catFillColors, borderWidth: 3, borderColor: catBorderColors, hoverOffset: 8 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { padding: 10, usePointStyle: true } } },
+          cutout: '60%'
+        }
+      });
+
+      const pmLabels = data.paymentMethods.map(d => d.label.charAt(0).toUpperCase() + d.label.slice(1));
+      const pmValues = data.paymentMethods.map(d => d.value);
+      const pmFillColors = pmLabels.map((_, i) => pieColors[i % pieColors.length]);
+      const pmBorderColors = pmLabels.map((_, i) => {
+        const c = pieColors[i % pieColors.length];
+        return c.replace(')', ',0.6)').replace('rgb', 'rgba');
+      });
+
+      this.pieChart = new Chart(document.getElementById('pieChart'), {
+        type: 'pie',
+        data: { labels: pmLabels, datasets: [{ data: pmValues, backgroundColor: pmFillColors, borderWidth: 3, borderColor: pmBorderColors, hoverOffset: 10 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { padding: 10, usePointStyle: true } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                  return ` ${ctx.label}: ${Components.formatCurrency(ctx.parsed)} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Donut/Pie charts error:', error);
     }
   },
 
@@ -136,7 +240,7 @@ const Dashboard = {
     this.currentPeriod = period;
     await this.loadCharts();
     document.querySelectorAll('.chart-controls button').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    if (event && event.target) event.target.classList.add('active');
   },
 
   updateDateTime() {

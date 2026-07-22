@@ -24,6 +24,8 @@ const Modal = {
     document.getElementById('modal').innerHTML = '';
   },
 
+  close() { this.hide(); },
+
   confirm(message, onConfirm, options = {}) {
     const title = options.title || 'Confirm';
     const footer = `

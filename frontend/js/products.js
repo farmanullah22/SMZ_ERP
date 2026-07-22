@@ -21,6 +21,9 @@ const Products = {
             <button class="btn btn-secondary btn-sm" onclick="Products.showCategoryModal()">
               <i class="fas fa-tags"></i> Manage Categories
             </button>
+            <button class="btn btn-info btn-sm" onclick="Products.exportPDF()">
+              <i class="fas fa-file-pdf"></i> PDF
+            </button>
             <button class="btn btn-primary" onclick="Products.showAddModal()">
               <i class="fas fa-plus"></i> Add Service
             </button>
@@ -312,6 +315,23 @@ const Products = {
         Toast.error(error.message || 'Failed to delete product');
       }
     }, { title: 'Delete Product', type: 'danger' });
+  },
+
+  async exportPDF() {
+    const products = await API.products.getAll(this.filters);
+    if (!products.length) { Toast.warning('No data to export'); return; }
+    const ok = Components.exportPDF(
+      'SMZ - Products Report',
+      ['SKU', 'Name', 'Category', 'Qty', 'Cost', 'Sale Price', 'Supplier'],
+      products.map(p => [
+        p.sku || '-', p.name, p.category_name || '-', String(p.quantity),
+        Components.formatCurrency(p.cost_price), Components.formatCurrency(p.sale_price),
+        p.supplier_name || '-'
+      ]),
+      'smz-products'
+    );
+    if (ok) Toast.success('PDF exported successfully');
+    else Toast.error('Failed to export PDF');
   }
 };
 

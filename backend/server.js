@@ -25,6 +25,8 @@ app.use('/api/customers', require('./routes/customers'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/stamp-papers', require('./routes/stampPapers'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/settings', require('./routes/settings'));
 
 app.get('/api/health', (req, res) => {

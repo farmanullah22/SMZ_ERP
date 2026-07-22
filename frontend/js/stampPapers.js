@@ -7,14 +7,17 @@ const StampPapers = {
       const container = document.getElementById('stampPapersPage');
 
       container.innerHTML = `
-        <div class="page-header">
-          <h1 class="page-title">Stamp Paper</h1>
-          <div class="page-actions">
-            <button class="btn btn-primary" onclick="StampPapers.showAddModal()">
-              <i class="fas fa-plus"></i> Add Stamp Paper
-            </button>
-          </div>
+      <div class="page-header">
+        <h1 class="page-title">Stamp Paper</h1>
+        <div class="page-actions">
+          <button class="btn btn-info btn-sm" onclick="StampPapers.exportPDF()">
+            <i class="fas fa-file-pdf"></i> PDF
+          </button>
+          <button class="btn btn-primary" onclick="StampPapers.showAddModal()">
+            <i class="fas fa-plus"></i> Add Stamp Paper
+          </button>
         </div>
+      </div>
 
         <div id="stampPapersList">
           ${this.renderTable(items)}
@@ -33,13 +36,12 @@ const StampPapers = {
     }
 
     return Components.table(
-      ['Name', 'Price', 'Profit', 'Actions'],
+      ['Name', 'Price', 'Profit'],
       items.map(item => {
         const row = [
           item.name,
           Components.formatCurrency(item.price),
-          item.profit === null || item.profit === undefined ? '-' : Components.formatCurrency(item.profit),
-          ''
+          item.profit === null || item.profit === undefined ? '-' : Components.formatCurrency(item.profit)
         ];
         row.id = item.id;
         return row;
@@ -138,6 +140,24 @@ const StampPapers = {
         Toast.error(error.message || 'Failed to delete');
       }
     }, { title: 'Delete Stamp Paper', type: 'danger' });
+  },
+
+  async exportPDF() {
+    try {
+      const items = await API.stampPapers.getAll();
+      if (!items.length) { Toast.warning('No data to export'); return; }
+      const ok = Components.exportPDF(
+        'SMZ - Stamp Papers Report',
+        ['Name', 'Price', 'Profit'],
+        items.map(i => [
+          i.name, Components.formatCurrency(i.price),
+          i.profit === null || i.profit === undefined ? '-' : Components.formatCurrency(i.profit)
+        ]),
+        'smz-stamp-papers'
+      );
+      if (ok) Toast.success('PDF exported successfully');
+      else Toast.error('Failed to export PDF');
+    } catch (e) { Toast.error('Failed to export PDF'); }
   }
 };
 

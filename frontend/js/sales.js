@@ -13,6 +13,9 @@ const Sales = {
       <div class="page-header">
         <h1 class="page-title">Sales</h1>
         <div class="page-actions">
+          <button class="btn btn-info btn-sm" onclick="Sales.exportPDF()">
+            <i class="fas fa-file-pdf"></i> PDF
+          </button>
           <button class="btn btn-primary" onclick="Sales.showNewSaleModal()">
             <i class="fas fa-plus"></i> New Sale
           </button>
@@ -49,7 +52,7 @@ const Sales = {
       }
 
       container.innerHTML = Components.table(
-        ['Invoice', 'Date', 'Items', 'Total', 'Profit', 'Payment', 'Actions'],
+        ['Invoice', 'Date', 'Items', 'Total', 'Profit', 'Payment'],
         sales.map(s => {
           const row = [
             s.invoice_number,
@@ -57,17 +60,17 @@ const Sales = {
             s.items_count || 0,
             Components.formatCurrency(s.total_amount),
             Components.formatCurrency(s.total_profit),
-            Components.badge(s.payment_method || 'cash', 'info'),
-            ''
+            Components.badge(s.payment_method || 'cash', 'info')
           ];
           row.id = s.id;
           return row;
         }),
-        [{ icon: 'eye', action: 'view' }, { icon: 'trash', action: 'delete', class: 'danger' }]
+        [{ icon: 'eye', action: 'view' }, { icon: 'edit', action: 'edit' }, { icon: 'trash', action: 'delete', class: 'danger' }]
       );
 
       sales.forEach(s => {
         document.querySelector(`[data-action="view"][data-id="${s.id}"]`)?.addEventListener('click', () => this.viewSale(s));
+        document.querySelector(`[data-action="edit"][data-id="${s.id}"]`)?.addEventListener('click', () => this.editSale(s));
         document.querySelector(`[data-action="delete"][data-id="${s.id}"]`)?.addEventListener('click', () => this.confirmDelete(s));
       });
     } catch (error) {
@@ -343,6 +346,31 @@ const Sales = {
       },
       { title: 'Delete Sale', type: 'danger' }
     );
+  },
+
+  editSale(sale) {
+    this.viewSale(sale);
+  },
+
+  async exportPDF() {
+    try {
+      const sales = await API.sales.getAll(this.filters);
+      if (!sales.length) { Toast.warning('No data to export'); return; }
+      const ok = Components.exportPDF(
+        'SMZ - Sales Report',
+        ['Invoice', 'Date', 'Customer', 'Total', 'Profit', 'Payment'],
+        sales.map(s => [
+          s.invoice_number, Components.formatDate(s.created_at),
+          s.customer_name || 'Walk-in',
+          Components.formatCurrency(s.total_amount),
+          Components.formatCurrency(s.total_profit),
+          s.payment_method || 'cash'
+        ]),
+        'smz-sales'
+      );
+      if (ok) Toast.success('PDF exported successfully');
+      else Toast.error('Failed to export PDF');
+    } catch (e) { Toast.error('Failed to export PDF'); }
   }
 };
 

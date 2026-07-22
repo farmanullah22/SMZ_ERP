@@ -11,7 +11,8 @@ const getAllSales = (req, res) => {
   try {
     const { startDate, endDate, customer, search } = req.query;
     let query = `
-      SELECT s.*, c.name as customer_name
+      SELECT s.*, c.name as customer_name,
+        (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.id) as items_count
       FROM sales s
       LEFT JOIN customers c ON s.customer_id = c.id
       WHERE 1=1
@@ -34,8 +35,8 @@ const getAllSales = (req, res) => {
     }
 
     if (search) {
-      query += ' AND s.invoice_number LIKE ?';
-      params.push(`%${search}%`);
+      query += ' AND (s.invoice_number LIKE ? OR c.name LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
     }
 
     query += ' ORDER BY s.created_at DESC';

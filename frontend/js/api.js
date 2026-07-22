@@ -128,6 +128,24 @@ const API = {
     getHistory: () => API.request('/reports/history')
   },
 
+  analytics: {
+    getData: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return API.request(`/analytics${query ? `?${query}` : ''}`);
+    }
+  },
+
+  expenses: {
+    getAll: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return API.request(`/expenses${query ? `?${query}` : ''}`);
+    },
+    getCategories: () => API.request('/expenses/categories'),
+    create: (data) => API.request('/expenses', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => API.request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => API.request(`/expenses/${id}`, { method: 'DELETE' })
+  },
+
   settings: {
     getAll: () => API.request('/settings'),
     update: (key, value) => API.request('/settings', { method: 'PUT', body: JSON.stringify({ key, value }) }),

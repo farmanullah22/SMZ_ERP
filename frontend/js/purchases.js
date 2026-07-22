@@ -15,6 +15,9 @@ const Purchases = {
       <div class="page-header">
         <h1 class="page-title">Purchases</h1>
         <div class="page-actions">
+          <button class="btn btn-info btn-sm" onclick="Purchases.exportPDF()">
+            <i class="fas fa-file-pdf"></i> PDF
+          </button>
           <button class="btn btn-primary" onclick="Purchases.showAddModal()">
             <i class="fas fa-plus"></i> Add Purchase
           </button>
@@ -28,6 +31,7 @@ const Purchases = {
           <option value="">All Suppliers</option>
           ${suppliers.map(s => `<option value="${s.id}" ${this.filters.supplier == s.id ? 'selected' : ''}>${s.company_name}</option>`).join('')}
         </select>
+        <input type="text" id="purchaseSearch" placeholder="Search reference or supplier..." value="${this.filters.search}">
         <button class="btn btn-sm btn-primary" onclick="Purchases.loadPurchasesList()"><i class="fas fa-search"></i> Filter</button>
       </div>
 
@@ -45,19 +49,19 @@ const Purchases = {
     }
     
     return Components.table(
-      ['Reference', 'Date', 'Supplier', 'Items', 'Total', 'Actions'],
+      ['Reference', 'Date', 'Supplier', 'Items', 'Total'],
       purchases.map(p => {
         const row = [
           p.reference_number,
           Components.formatDateTime(p.created_at),
           p.supplier_name || '-',
-          Components.formatCurrency(p.total_amount),
-          ''
+          p.items_count || 0,
+          Components.formatCurrency(p.total_amount)
         ];
         row.id = p.id;
         return row;
       }),
-      [{ icon: 'eye', action: 'view' }, { icon: 'trash', action: 'delete', class: 'danger' }]
+      [{ icon: 'eye', action: 'view' }, { icon: 'edit', action: 'edit' }, { icon: 'trash', action: 'delete', class: 'danger' }]
     );
   },
 
@@ -65,6 +69,7 @@ const Purchases = {
     this.filters.startDate = document.getElementById('purchaseStartDate').value;
     this.filters.endDate = document.getElementById('purchaseEndDate').value;
     this.filters.supplier = document.getElementById('purchaseSupplier').value;
+    this.filters.search = document.getElementById('purchaseSearch').value;
 
     try {
       const purchases = await API.purchases.getAll(this.filters);
@@ -76,7 +81,7 @@ const Purchases = {
   },
 
   bindFilterEvents() {
-    ['purchaseStartDate', 'purchaseEndDate', 'purchaseSupplier'].forEach(id => {
+    ['purchaseStartDate', 'purchaseEndDate', 'purchaseSupplier', 'purchaseSearch'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', () => {});
     });
   },
@@ -84,6 +89,7 @@ const Purchases = {
   bindTableEvents(purchases) {
     purchases.forEach(p => {
       document.querySelector(`[data-action="view"][data-id="${p.id}"]`)?.addEventListener('click', () => this.viewPurchase(p));
+      document.querySelector(`[data-action="edit"][data-id="${p.id}"]`)?.addEventListener('click', () => this.editPurchase(p));
       document.querySelector(`[data-action="delete"][data-id="${p.id}"]`)?.addEventListener('click', () => this.confirmDelete(p));
     });
   },
@@ -318,6 +324,29 @@ const Purchases = {
       },
       { title: 'Delete Purchase', type: 'danger' }
     );
+  },
+
+  editPurchase(purchase) {
+    this.viewPurchase(purchase);
+  },
+
+  async exportPDF() {
+    try {
+      const purchases = await API.purchases.getAll(this.filters);
+      if (!purchases.length) { Toast.warning('No data to export'); return; }
+      const ok = Components.exportPDF(
+        'SMZ - Purchases Report',
+        ['Reference', 'Date', 'Supplier', 'Items', 'Amount', 'Notes'],
+        purchases.map(p => [
+          p.reference_number, Components.formatDate(p.created_at),
+          p.supplier_name || '-', String(p.items_count || 0),
+          Components.formatCurrency(p.total_amount), p.notes || '-'
+        ]),
+        'smz-purchases'
+      );
+      if (ok) Toast.success('PDF exported successfully');
+      else Toast.error('Failed to export PDF');
+    } catch (e) { Toast.error('Failed to export PDF'); }
   }
 };
 

@@ -210,6 +210,18 @@ async function initDatabase() {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL DEFAULT 'Other',
+      amount REAL NOT NULL,
+      description TEXT,
+      payment_method TEXT DEFAULT 'cash',
+      expense_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   const txInfo = db.exec('PRAGMA table_info(transactions)');
   const txCols = txInfo[0]?.values || [];
   const hasProfit = txCols.some(col => col[1] === 'profit');

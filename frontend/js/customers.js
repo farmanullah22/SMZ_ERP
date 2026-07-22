@@ -9,6 +9,9 @@ const Customers = {
       <div class="page-header">
         <h1 class="page-title">Customers</h1>
         <div class="page-actions">
+          <button class="btn btn-info btn-sm" onclick="Customers.exportPDF()">
+            <i class="fas fa-file-pdf"></i> PDF
+          </button>
           <button class="btn btn-primary" onclick="Customers.showAddModal()">
             <i class="fas fa-plus"></i> Add Customer
           </button>
@@ -49,12 +52,13 @@ const Customers = {
         row.id = c.id;
         return row;
       }),
-      [{ icon: 'edit', action: 'edit' }, { icon: 'trash', action: 'delete', class: 'danger' }]
+      [{ icon: 'user', action: 'view' }, { icon: 'edit', action: 'edit' }, { icon: 'trash', action: 'delete', class: 'danger' }]
     );
   },
 
   bindTableEvents(customers) {
     customers.forEach(c => {
+      document.querySelector(`[data-action="view"][data-id="${c.id}"]`)?.addEventListener('click', () => this.showProfile(c.id));
       document.querySelector(`[data-action="edit"][data-id="${c.id}"]`)?.addEventListener('click', () => this.showEditModal(c));
       document.querySelector(`[data-action="delete"][data-id="${c.id}"]`)?.addEventListener('click', () => this.confirmDelete(c));
     });
@@ -115,6 +119,53 @@ const Customers = {
       try { await API.customers.delete(customer.id); Toast.success('Deleted'); await this.loadPage(); }
       catch (error) { Toast.error('Failed to delete'); }
     }, { title: 'Delete Customer', type: 'danger' });
+  },
+
+  async showProfile(id) {
+    try {
+      Modal.loading(true);
+      const customer = await API.customers.getById(id);
+      Modal.loading(false);
+      Modal.show(`
+        <div style="text-align: center; padding: 20px 0;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #8b5cf6); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+            <i class="fas fa-user" style="font-size: 36px; color: white;"></i>
+          </div>
+          <h3 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">${customer.name}</h3>
+          <p class="text-muted" style="margin-bottom: 20px;">Customer Profile</p>
+          <div class="form-grid" style="text-align: left; max-width: 500px; margin: 0 auto;">
+            <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Email</label><p>${customer.email || '-'}</p></div>
+            <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Phone</label><p>${customer.phone || '-'}</p></div>
+            <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Address</label><p>${customer.address || '-'}</p></div>
+            <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Total Purchases</label><p>${customer.total_purchases || 0}</p></div>
+            <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Total Spent</label><p>${Components.formatCurrency(customer.total_spent || 0)}</p></div>
+          </div>
+        </div>`, {
+        title: 'Customer Profile',
+        footer: `<button class="btn btn-secondary" onclick="Customers.showEditModal(${JSON.stringify(customer).replace(/"/g, '&quot;')}); Modal.hide();"><i class="fas fa-edit"></i> Edit</button><button class="btn btn-secondary" onclick="Modal.hide()">Close</button>`
+      });
+    } catch (error) {
+      Modal.loading(false);
+      Toast.error('Failed to load profile');
+    }
+  },
+
+  async exportPDF() {
+    try {
+      const customers = await API.customers.getAll({});
+      if (!customers.length) { Toast.warning('No data to export'); return; }
+      const ok = Components.exportPDF(
+        'SMZ - Customers Report',
+        ['Name', 'Email', 'Phone', 'Address', 'Purchases', 'Total Spent'],
+        customers.map(c => [
+          c.name, c.email || '-', c.phone || '-', c.address || '-',
+          String(c.total_purchases || 0), Components.formatCurrency(c.total_spent || 0)
+        ]),
+        'smz-customers'
+      );
+      if (ok) Toast.success('PDF exported successfully');
+      else Toast.error('Failed to export PDF');
+    } catch (e) { Toast.error('Failed to export PDF'); }
   }
 };
 

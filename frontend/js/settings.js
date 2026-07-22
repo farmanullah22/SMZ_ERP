@@ -86,13 +86,12 @@ const Settings = {
   renderUsers(users) {
     if (users.length === 0) return Components.emptyState('users', 'No Users', 'Add users to manage access');
     return Components.table(
-      ['Username', 'Role', 'Created', 'Actions'],
+      ['Username', 'Role', 'Created'],
       users.map(u => {
         const row = [
           u.username,
           Components.badge(u.role, u.role === 'admin' ? 'primary' : 'info'),
-          Components.formatDate(u.created_at),
-          ''
+          Components.formatDate(u.created_at)
         ];
         row.id = u.id;
         return row;

@@ -9,6 +9,9 @@ const Suppliers = {
       <div class="page-header">
         <h1 class="page-title">Suppliers</h1>
         <div class="page-actions">
+          <button class="btn btn-info btn-sm" onclick="Suppliers.exportPDF()">
+            <i class="fas fa-file-pdf"></i> PDF
+          </button>
           <button class="btn btn-primary" onclick="Suppliers.showAddModal()">
             <i class="fas fa-plus"></i> Add Supplier
           </button>
@@ -36,15 +39,14 @@ const Suppliers = {
   renderTable(suppliers) {
     if (suppliers.length === 0) return Components.emptyState('industry', 'No Suppliers', 'Add suppliers to see them here');
     return Components.table(
-      ['Company', 'Contact', 'Email', 'Phone', 'Products', 'Actions'],
+      ['Company', 'Contact', 'Email', 'Phone', 'Products'],
       suppliers.map(s => {
         const row = [
           s.company_name,
           s.contact_person || '-',
           s.email || '-',
           s.phone || '-',
-          s.product_count || 0,
-          ''
+          s.product_count || 0
         ];
         row.id = s.id;
         return row;
@@ -117,6 +119,24 @@ const Suppliers = {
       try { await API.products.deleteSupplier(supplier.id); Toast.success('Deleted'); await this.loadPage(); }
       catch (error) { Toast.error('Failed to delete'); }
     }, { title: 'Delete Supplier', type: 'danger' });
+  },
+
+  async exportPDF() {
+    try {
+      const suppliers = await API.products.getSuppliers();
+      if (!suppliers.length) { Toast.warning('No data to export'); return; }
+      const ok = Components.exportPDF(
+        'SMZ - Suppliers Report',
+        ['Company', 'Contact', 'Email', 'Phone', 'Products'],
+        suppliers.map(s => [
+          s.company_name, s.contact_person || '-', s.email || '-',
+          s.phone || '-', String(s.product_count || 0)
+        ]),
+        'smz-suppliers'
+      );
+      if (ok) Toast.success('PDF exported successfully');
+      else Toast.error('Failed to export PDF');
+    } catch (e) { Toast.error('Failed to export PDF'); }
   }
 };
 

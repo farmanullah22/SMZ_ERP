@@ -11,7 +11,8 @@ const getAllPurchases = (req, res) => {
   try {
     const { startDate, endDate, supplier, search } = req.query;
     let query = `
-      SELECT p.*, s.company_name as supplier_name
+      SELECT p.*, s.company_name as supplier_name,
+        (SELECT COUNT(*) FROM purchase_items pi WHERE pi.purchase_id = p.id) as items_count
       FROM purchases p
       LEFT JOIN suppliers s ON p.supplier_id = s.id
       WHERE 1=1
@@ -34,8 +35,8 @@ const getAllPurchases = (req, res) => {
     }
 
     if (search) {
-      query += ' AND p.reference_number LIKE ?';
-      params.push(`%${search}%`);
+      query += ' AND (p.reference_number LIKE ? OR s.company_name LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
     }
 
     query += ' ORDER BY p.created_at DESC';

@@ -105,6 +105,8 @@ const App = {
       case 'suppliers': await Suppliers.init(); break;
       case 'stampPapers': await StampPapers.init(); break;
       case 'accounts': await Accounts.init(); break;
+      case 'expenses': await Expenses.init(); break;
+      case 'analytics': await Analytics.init(); break;
       case 'reports': await Reports.init(); break;
       case 'settings': await Settings.init(); break;
     }
