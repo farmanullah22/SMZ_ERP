@@ -80,14 +80,11 @@ const Dashboard = {
           ${Components.statCard('shopping-cart', 'Total Sales', Components.formatCurrency(stats.totalSales), `Today: ${Components.formatCurrency(stats.todaySales)}`, 'primary')}
           ${Components.statCard('chart-line', 'Total Profit', Components.formatCurrency(stats.totalProfit), `This Month: ${Components.formatCurrency(stats.monthProfit)}`, 'success')}
           ${Components.statCard('truck', 'Purchases', Components.formatCurrency(stats.totalExpenses), `${stats.productCount} Products`, 'warning')}
-        </div>
-
-        <div class="stats-grid">
+          ${Components.statCard('boxes', 'Stock Value', Components.formatCurrency(stats.inventoryValue), `${stats.productCount} Items`, 'info')}
           ${Components.statCard('file-signature', 'Stamp Papers', Components.formatCurrency(stampTotal), `Profit: ${Components.formatCurrency(stampProfit)}`, 'secondary')}
           ${Components.statCard('receipt', 'Op. Expenses', Components.formatCurrency(totalExpensesOp), `${expenseCount} Entries`, 'danger')}
-          ${Components.statCard('boxes', 'Stock Value', Components.formatCurrency(stats.inventoryValue), `${stats.productCount} Items`, 'info')}
-          ${Components.statCard('mobile-alt', 'EasyPaisa/JazzCash', Components.formatCurrency(mobileStats.cashIn + mobileStats.cashOut), `In: ${Components.formatCurrency(mobileStats.cashIn)} | Out: ${Components.formatCurrency(mobileStats.cashOut)} | Comm: ${Components.formatCurrency(mobileStats.commission)}`, 'primary')}
-          ${Components.statCard('sim-card', 'Mobile Load', Components.formatCurrency(rechargeStats.totalAmount), `Profit: ${Components.formatCurrency(rechargeStats.totalProfit)} | Count: ${rechargeStats.count}`, 'success')}
+          ${Components.statCard('mobile-alt', 'EasyPaisa/JazzCash', Components.formatCurrency(mobileStats.cashIn + mobileStats.cashOut), `In: ${Components.formatCurrency(mobileStats.cashIn)} | Out: ${Components.formatCurrency(mobileStats.cashOut)}`, 'primary')}
+          ${Components.statCard('sim-card', 'Mobile Load', Components.formatCurrency(rechargeStats.totalAmount), `Profit: ${Components.formatCurrency(rechargeStats.totalProfit)}`, 'success')}
         </div>
 
         <div class="charts-grid">
