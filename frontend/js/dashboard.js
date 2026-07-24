@@ -29,10 +29,12 @@ const Dashboard = {
   async loadStats() {
     try {
       const dateParams = this.getDateParams();
-      const [stats, stampPapers, expenses] = await Promise.all([
+      const [stats, stampPapers, expenses, mobileStats, rechargeStats] = await Promise.all([
         API.sales.getStats(dateParams),
         API.stampPapers.getAll().catch(() => []),
-        API.expenses.getAll({}).catch(() => ({ expenses: [], summary: { total: 0 } }))
+        API.expenses.getAll({}).catch(() => ({ expenses: [], summary: { total: 0 } })),
+        API.mobileTransactions.getStats(dateParams).catch(() => ({ cashIn: 0, cashOut: 0, commission: 0, count: 0 })),
+        API.recharges.getStats(dateParams).catch(() => ({ totalAmount: 0, totalCommission: 0, totalProfit: 0, count: 0, byNetwork: {} }))
       ]);
 
       const stampTotal = stampPapers.reduce((s, p) => s + (p.price || 0), 0);
@@ -84,6 +86,8 @@ const Dashboard = {
           ${Components.statCard('file-signature', 'Stamp Papers', Components.formatCurrency(stampTotal), `Profit: ${Components.formatCurrency(stampProfit)}`, 'secondary')}
           ${Components.statCard('receipt', 'Op. Expenses', Components.formatCurrency(totalExpensesOp), `${expenseCount} Entries`, 'danger')}
           ${Components.statCard('boxes', 'Stock Value', Components.formatCurrency(stats.inventoryValue), `${stats.productCount} Items`, 'info')}
+          ${Components.statCard('mobile-alt', 'EasyPaisa/JazzCash', Components.formatCurrency(mobileStats.cashIn + mobileStats.cashOut), `In: ${Components.formatCurrency(mobileStats.cashIn)} | Out: ${Components.formatCurrency(mobileStats.cashOut)} | Comm: ${Components.formatCurrency(mobileStats.commission)}`, 'primary')}
+          ${Components.statCard('sim-card', 'Mobile Load', Components.formatCurrency(rechargeStats.totalAmount), `Profit: ${Components.formatCurrency(rechargeStats.totalProfit)} | Count: ${rechargeStats.count}`, 'success')}
         </div>
 
         <div class="charts-grid">
