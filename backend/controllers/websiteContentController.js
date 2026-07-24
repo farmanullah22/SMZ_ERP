@@ -36,13 +36,7 @@ function getDefaultContent() {
       button1_link: '#contact',
       button2_text: 'Contact Us',
       button2_link: '#contact',
-      image: '',
-      stats: [
-        { number: '10+', label: 'Years Record Storage' },
-        { number: 'Instant', label: 'Smart Search' },
-        { number: 'Secure', label: 'Data Backup' },
-        { number: '100%', label: 'Easy to Use' }
-      ]
+      image: ''
     },
     stampSearch: {
       heading: 'Find Any Stamp Paper Instantly',

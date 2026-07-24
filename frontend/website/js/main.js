@@ -25,13 +25,6 @@ const Website = {
 
     document.title = (st.site_name || 'SMZ ERP') + ' - Shop Management Software';
 
-    const heroStats = (h.stats || []).map(s => `
-      <div class="hero-stat">
-        <span class="stat-number">${s.number || ''}</span>
-        <span class="stat-label">${s.label || ''}</span>
-      </div>
-    `).join('');
-
     const featuresItems = (ft.items || []).map(f => `
       <div class="feature-card">
         <div class="feature-icon" style="background:${f.color || '#eef2ff'};color:${f.iconColor || '#4f46e5'};"><i class="fas fa-${f.icon || 'check'}"></i></div>
@@ -65,7 +58,6 @@ const Website = {
             <a href="#features" class="nav-link">Features</a>
             <a href="#contact" class="nav-link">Contact</a>
           </div>
-          <a href="#contact" class="btn-nav">${h.button1_text || 'Get Free Demo'}</a>
           <button class="hamburger" id="hamburgerBtn"><i class="fas fa-bars"></i></button>
         </div>
       </nav>
@@ -114,7 +106,6 @@ const Website = {
               </div>` : ''}
             </div>
           </div>
-          ${heroStats ? `<div class="hero-stats"><div class="container"><div class="stats-row">${heroStats}</div></div></div>` : ''}
         </section>
 
         <!-- Stamp Paper Search -->
