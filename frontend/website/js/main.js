@@ -19,8 +19,6 @@ const Website = {
     const ab = c.about || {};
     const ft = c.features || {};
     const wc = c.whyChoose || {};
-    const pr = c.process || {};
-    const tt = c.testimonials || {};
     const ct = c.cta || {};
     const cn = c.contact || {};
     const st = c.site || {};
@@ -50,30 +48,6 @@ const Website = {
       </div>
     `).join('');
 
-    const processSteps = (pr.steps || []).map(p => `
-      <div class="process-step">
-        <div class="step-number">${p.number || 0}</div>
-        <div class="step-content">
-          <h3>${p.title || ''}</h3>
-          <p>${p.text || ''}</p>
-        </div>
-      </div>
-    `).join('');
-
-    const testimonialItems = (tt.items || []).map(t => `
-      <div class="testimonial-card">
-        <div class="testimonial-stars">${'★'.repeat(t.rating || 5)}</div>
-        <p>"${t.text || ''}"</p>
-        <div class="testimonial-author">
-          <div class="testimonial-avatar">${(t.name || '?').charAt(0)}</div>
-          <div>
-            <div class="testimonial-name">${t.name || ''}</div>
-            <div class="testimonial-role">${t.role || ''}</div>
-          </div>
-        </div>
-      </div>
-    `).join('');
-
     const sl = c.heroSlider || {};
     const sliderImages = sl.images || [];
     const hasSlider = sliderImages.length > 0;
@@ -89,8 +63,6 @@ const Website = {
             <a href="#home" class="nav-link active">Home</a>
             <a href="#about" class="nav-link">About</a>
             <a href="#features" class="nav-link">Features</a>
-            <a href="#process" class="nav-link">How It Works</a>
-            <a href="#testimonials" class="nav-link">Testimonials</a>
             <a href="#contact" class="nav-link">Contact</a>
           </div>
           <a href="#contact" class="btn-nav">${h.button1_text || 'Get Free Demo'}</a>
@@ -109,8 +81,6 @@ const Website = {
           <a href="#home" class="drawer-link active">Home</a>
           <a href="#about" class="drawer-link">About</a>
           <a href="#features" class="drawer-link">Features</a>
-          <a href="#process" class="drawer-link">How It Works</a>
-          <a href="#testimonials" class="drawer-link">Testimonials</a>
           <a href="#contact" class="drawer-link">Contact</a>
         </div>
       </div>
@@ -135,7 +105,7 @@ const Website = {
           <div class="container">
             <div class="hero-content${hasSlider ? ' hero-content-overlay' : ''}">
               ${!hasSlider && h.badge ? `<span class="hero-badge">${h.badge}</span>` : ''}
-              ${!hasSlider ? `<h1 class="hero-title">${h.heading || ''}</h1>` : ''}
+              ${!hasSlider ? `<h1 class="hero-title">${(h.heading || '').replace(/(One Place|Manage|Shop|Records)/, '<span>$1</span>')}</h1>` : ''}
               ${!hasSlider && h.subheading ? `<p class="hero-subtitle">${h.subheading}</p>` : ''}
               ${!hasSlider && h.description ? `<p class="hero-desc">${h.description}</p>` : ''}
               ${!hasSlider ? `<div class="hero-buttons">
@@ -193,28 +163,6 @@ const Website = {
               <h2 class="section-title">${wc.heading || ''}</h2>
             </div>
             <div class="why-grid">${whyItems}</div>
-          </div>
-        </section>
-
-        <!-- How It Works -->
-        <section class="process" id="process">
-          <div class="container">
-            <div class="process-header">
-              ${pr.tag ? `<span class="section-tag">${pr.tag}</span>` : ''}
-              <h2 class="section-title">${pr.heading || ''}</h2>
-            </div>
-            <div class="process-steps">${processSteps}</div>
-          </div>
-        </section>
-
-        <!-- Testimonials -->
-        <section class="testimonials" id="testimonials">
-          <div class="container">
-            <div class="testimonials-header">
-              ${tt.tag ? `<span class="section-tag">${tt.tag}</span>` : ''}
-              <h2 class="section-title">${tt.heading || ''}</h2>
-            </div>
-            <div class="testimonials-grid">${testimonialItems}</div>
           </div>
         </section>
 
@@ -303,6 +251,12 @@ const Website = {
       navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === `#${current}`));
     }
     window.addEventListener('scroll', updateActive);
+
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
 
     navLinks.forEach(link => {
       link.addEventListener('click', e => {
