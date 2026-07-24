@@ -137,12 +137,7 @@ const searchStampPaper = async (req, res) => {
   try {
     const { number } = req.query;
     if (!number) return res.status(400).json({ error: 'Stamp paper number is required' });
-    const papers = await StampPaper.find({
-      $or: [
-        { stamp_number: { $regex: number, $options: 'i' } },
-        { name: { $regex: number, $options: 'i' } }
-      ]
-    }).limit(20);
+    const papers = await StampPaper.find({ stamp_number: number }).limit(20);
     res.json({ results: papers });
   } catch (error) {
     res.status(500).json({ error: error.message });
