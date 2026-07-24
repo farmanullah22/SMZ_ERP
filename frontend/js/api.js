@@ -108,7 +108,8 @@ const API = {
     },
     create: (data) => API.request('/stamp-papers', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => API.request(`/stamp-papers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id) => API.request(`/stamp-papers/${id}`, { method: 'DELETE' })
+    delete: (id) => API.request(`/stamp-papers/${id}`, { method: 'DELETE' }),
+    uploadDoc: (file) => { const fd = new FormData(); fd.append('document', file); return fetch(`${API.baseUrl}/stamp-papers/upload-doc`, { method: 'POST', body: fd }).then(r => r.json()); }
   },
 
   reports: {

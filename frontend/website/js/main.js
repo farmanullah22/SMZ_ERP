@@ -134,14 +134,14 @@ const Website = {
           ` : `<div class="hero-bg"></div>`}
           <div class="container">
             <div class="hero-content${hasSlider ? ' hero-content-overlay' : ''}">
-              ${h.badge ? `<span class="hero-badge">${h.badge}</span>` : ''}
-              <h1 class="hero-title">${h.heading || ''}</h1>
-              ${h.subheading ? `<p class="hero-subtitle">${h.subheading}</p>` : ''}
-              ${h.description ? `<p class="hero-desc">${h.description}</p>` : ''}
-              <div class="hero-buttons">
+              ${!hasSlider && h.badge ? `<span class="hero-badge">${h.badge}</span>` : ''}
+              ${!hasSlider ? `<h1 class="hero-title">${h.heading || ''}</h1>` : ''}
+              ${!hasSlider && h.subheading ? `<p class="hero-subtitle">${h.subheading}</p>` : ''}
+              ${!hasSlider && h.description ? `<p class="hero-desc">${h.description}</p>` : ''}
+              ${!hasSlider ? `<div class="hero-buttons">
                 ${h.button1_text ? `<a href="${h.button1_link || '#contact'}" class="btn-primary"><i class="fas fa-play"></i> ${h.button1_text}</a>` : ''}
                 ${h.button2_text ? `<a href="${h.button2_link || '#contact'}" class="btn-secondary"><i class="fas fa-phone"></i> ${h.button2_text}</a>` : ''}
-              </div>
+              </div>` : ''}
             </div>
           </div>
           ${heroStats ? `<div class="hero-stats"><div class="container"><div class="stats-row">${heroStats}</div></div></div>` : ''}
@@ -388,9 +388,20 @@ const Website = {
       if (data.results && data.results.length > 0) {
         resultDiv.innerHTML = data.results.map(p => `
           <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-top:12px;text-align:left;">
-            <strong>${p.name}</strong> — ${p.type || ''} ${p.value ? `| Value: PKR ${p.value}` : ''}
-            <span style="display:block;font-size:13px;color:#64748b;margin-top:4px;">${p.customer_name ? `Customer: ${p.customer_name}` : ''} ${p.mobile ? `| ${p.mobile}` : ''}</span>
-            ${p.documents ? `<span style="display:block;font-size:13px;color:#64748b;">Documents: ${Array.isArray(p.documents) ? p.documents.join(', ') : p.documents}</span>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <strong>${p.stamp_number ? '#' + p.stamp_number + ' — ' : ''}${p.name}</strong>
+                ${p.type ? `<span style="font-size:13px;color:#64748b;">${p.type}</span>` : ''}
+                ${p.value ? `<span style="font-size:13px;color:#64748b;">| Value: PKR ${p.value}</span>` : ''}
+              </div>
+              ${p.documents && p.documents.length ? `<a href="${p.documents[0]}" target="_blank" class="btn-primary" style="padding:6px 14px;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;" download><i class="fas fa-download"></i> Download</a>` : ''}
+            </div>
+            ${p.customer_name || p.mobile || p.purpose ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#475569;">
+              ${p.customer_name ? `<span><strong>Customer:</strong> ${p.customer_name}</span>` : ''}
+              ${p.mobile ? `<span><strong>Mobile:</strong> ${p.mobile}</span>` : ''}
+              ${p.purpose ? `<span><strong>Purpose:</strong> ${p.purpose}</span>` : ''}
+            </div>` : ''}
+            ${p.documents && p.documents.length > 1 ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${p.documents.map((doc, i) => `<a href="${doc}" target="_blank" style="font-size:12px;padding:4px 10px;background:#f1f5f9;border-radius:6px;color:#4f46e5;text-decoration:none;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-file"></i> Doc ${i+1} <i class="fas fa-download" style="font-size:10px;"></i></a>`).join('')}</div>` : ''}
           </div>
         `).join('');
       } else {
