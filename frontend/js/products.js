@@ -221,6 +221,10 @@ const Products = {
           <div class="input-group"><label>Quantity</label><input type="number" name="quantity" min="0" step="1" value="0" placeholder="0"></div>
           <div class="input-group"><label>Reorder Level</label><input type="number" name="reorder_level" min="0" step="1" value="10" placeholder="10"></div>
         </div>
+        <div class="form-grid">
+          <div class="input-group"><label>IMEI</label><input type="text" name="imei" placeholder="IMEI number"></div>
+          <div class="input-group"><label>Barcode</label><input type="text" name="barcode" placeholder="Barcode"></div>
+        </div>
         <div class="input-group"><label>Description</label><textarea name="description" rows="2" placeholder="Optional description"></textarea></div>
       </form>`, {
       title: 'Add New Service',
@@ -268,6 +272,10 @@ const Products = {
           <div class="form-grid">
             <div class="input-group"><label>Quantity</label><input type="number" name="quantity" min="0" step="1" value="${product.quantity}"></div>
             <div class="input-group"><label>Reorder Level</label><input type="number" name="reorder_level" min="0" step="1" value="${product.reorder_level}"></div>
+          </div>
+          <div class="form-grid">
+            <div class="input-group"><label>IMEI</label><input type="text" name="imei" value="${product.imei || ''}"></div>
+            <div class="input-group"><label>Barcode</label><input type="text" name="barcode" value="${product.barcode || ''}"></div>
           </div>
           <div class="input-group"><label>Description</label><textarea name="description" rows="2">${product.description || ''}</textarea></div>
         </form>`, {

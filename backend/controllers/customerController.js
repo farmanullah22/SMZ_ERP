@@ -10,7 +10,8 @@ const getAllCustomers = async (req, res) => {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
+        { phone: { $regex: search, $options: 'i' } },
+        { cnic: { $regex: search, $options: 'i' } }
       ];
     }
     const customers = await Customer.find(filter).sort('name');
@@ -58,12 +59,13 @@ const getCustomer = async (req, res) => {
 
 const createCustomer = async (req, res) => {
   try {
-    const { name, email, phone, address, notes } = req.body;
+    const { name, email, phone, cnic, address, notes } = req.body;
     if (!name) return res.status(400).json({ error: 'Customer name is required' });
     const customer = await Customer.create({
       name,
       email: email || null,
       phone: phone || null,
+      cnic: cnic || null,
       address: address || null,
       notes: notes || null
     });
@@ -79,11 +81,12 @@ const updateCustomer = async (req, res) => {
     const customer = await Customer.findById(id);
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
-    const { name, email, phone, address, notes } = req.body;
+    const { name, email, phone, cnic, address, notes } = req.body;
     const update = {};
     if (name !== undefined) update.name = name;
     if (email !== undefined) update.email = email;
     if (phone !== undefined) update.phone = phone;
+    if (cnic !== undefined) update.cnic = cnic;
     if (address !== undefined) update.address = address;
     if (notes !== undefined) update.notes = notes;
 

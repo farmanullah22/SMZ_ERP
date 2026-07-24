@@ -23,6 +23,10 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/website', require('./routes/website'));
+app.use('/api/services', require('./routes/services'));
+app.use('/api/mobile-transactions', require('./routes/mobileTransactions'));
+app.use('/api/recharges', require('./routes/recharges'));
+app.use('/api/credits', require('./routes/credits'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

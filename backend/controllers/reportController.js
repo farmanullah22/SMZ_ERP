@@ -259,10 +259,20 @@ const getAccountsReport = async (req, res) => {
 
 const getHistory = async (req, res) => {
   try {
-    const { limit = 100, offset = 0 } = req.query;
+    const { limit = 200, offset = 0, search, startDate, endDate } = req.query;
+    const filter = {};
+    if (startDate) filter.created_at = { ...filter.created_at, $gte: new Date(startDate) };
+    if (endDate) filter.created_at = { ...filter.created_at, $lte: new Date(endDate) };
+    if (search) {
+      filter.$or = [
+        { description: { $regex: search, $options: 'i' } },
+        { action_type: { $regex: search, $options: 'i' } },
+        { entity_type: { $regex: search, $options: 'i' } }
+      ];
+    }
     const [history, total] = await Promise.all([
-      History.find({}).sort({ created_at: -1 }).skip(parseInt(offset)).limit(parseInt(limit)),
-      History.countDocuments({})
+      History.find(filter).sort({ created_at: -1 }).skip(parseInt(offset)).limit(parseInt(limit)),
+      History.countDocuments(filter)
     ]);
     res.json({ history: history.map(h => h.toJSON()), total });
   } catch (error) {

@@ -55,7 +55,7 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description } = req.body;
+    const { sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description, imei, barcode } = req.body;
     if (!name || cost_price === undefined || sale_price === undefined) {
       return res.status(400).json({ error: 'Name, cost price, and sale price are required' });
     }
@@ -68,7 +68,9 @@ const createProduct = async (req, res) => {
       sale_price,
       quantity: quantity || 0,
       reorder_level: reorder_level || 10,
-      description: description || null
+      description: description || null,
+      imei: imei || null,
+      barcode: barcode || null
     });
     addHistory('CREATE', 'product', product.id, `Created product: ${name}`);
     res.status(201).json(product.toJSON());
@@ -82,7 +84,7 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const oldProduct = await Product.findById(id);
     if (!oldProduct) return res.status(404).json({ error: 'Product not found' });
-    const { sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description } = req.body;
+    const { sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description, imei, barcode } = req.body;
     const update = {};
     if (sku !== undefined) update.sku = sku;
     if (name !== undefined) update.name = name;
@@ -93,6 +95,8 @@ const updateProduct = async (req, res) => {
     if (quantity !== undefined) update.quantity = quantity;
     if (reorder_level !== undefined) update.reorder_level = reorder_level;
     if (description !== undefined) update.description = description || null;
+    if (imei !== undefined) update.imei = imei || null;
+    if (barcode !== undefined) update.barcode = barcode || null;
     await Product.findByIdAndUpdate(id, update);
     const updated = await Product.findById(id);
     addHistory('UPDATE', 'product', id, `Updated product: ${updated.name}`);

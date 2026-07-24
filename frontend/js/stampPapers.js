@@ -36,10 +36,12 @@ const StampPapers = {
     }
 
     return Components.table(
-      ['Name', 'Price', 'Profit'],
+      ['Name', 'Type', 'Value', 'Price', 'Profit'],
       items.map(item => {
         const row = [
           item.name,
+          item.type || '-',
+          item.value || '-',
           Components.formatCurrency(item.price),
           item.profit === null || item.profit === undefined ? '-' : Components.formatCurrency(item.profit)
         ];
@@ -63,8 +65,13 @@ const StampPapers = {
     Modal.show(`
       <form id="stampPaperForm">
         <div class="input-group"><label>Name *</label><input type="text" name="name" required placeholder="Stamp paper name"></div>
+        <div class="form-grid">
+          <div class="input-group"><label>Type</label><input type="text" name="type" placeholder="e.g. Judicial, Non-Judicial"></div>
+          <div class="input-group"><label>Value (PKR)</label><input type="number" name="value" min="0" step="0.01" placeholder="Face value"></div>
+        </div>
         <div class="input-group"><label>Price (PKR) *</label><input type="number" name="price" required min="0" step="0.01" placeholder="0.00"></div>
         <div class="input-group"><label>Profit (Optional)</label><input type="number" name="profit" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="input-group"><label>Documents</label><textarea name="documents" rows="2" placeholder="Associated documents (comma separated)"></textarea></div>
       </form>`, {
       title: 'Add Stamp Paper',
       footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="StampPapers.saveStampPaper()"><i class="fas fa-save"></i> Save</button>`
@@ -75,8 +82,13 @@ const StampPapers = {
     Modal.show(`
       <form id="stampPaperForm">
         <div class="input-group"><label>Name *</label><input type="text" name="name" required value="${item.name}"></div>
+        <div class="form-grid">
+          <div class="input-group"><label>Type</label><input type="text" name="type" value="${item.type || ''}"></div>
+          <div class="input-group"><label>Value (PKR)</label><input type="number" name="value" min="0" step="0.01" value="${item.value || ''}"></div>
+        </div>
         <div class="input-group"><label>Price (PKR) *</label><input type="number" name="price" required min="0" step="0.01" value="${item.price}"></div>
         <div class="input-group"><label>Profit (Optional)</label><input type="number" name="profit" min="0" step="0.01" value="${item.profit ?? ''}"></div>
+        <div class="input-group"><label>Documents</label><textarea name="documents" rows="2">${item.documents || ''}</textarea></div>
       </form>`, {
       title: 'Edit Stamp Paper',
       footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="StampPapers.saveStampPaper('${item.id}')"><i class="fas fa-save"></i> Update</button>`
@@ -101,6 +113,7 @@ const StampPapers = {
     data.name = data.name.trim();
     data.price = parseFloat(data.price);
     data.profit = data.profit === '' ? null : parseFloat(data.profit);
+    data.value = data.value === '' ? null : parseFloat(data.value);
 
     if (Number.isNaN(data.price) || data.price < 0) {
       Toast.warning('Price must be a valid number');
@@ -148,9 +161,10 @@ const StampPapers = {
       if (!items.length) { Toast.warning('No data to export'); return; }
       const ok = Components.exportPDF(
         'SMZ - Stamp Papers Report',
-        ['Name', 'Price', 'Profit'],
+        ['Name', 'Type', 'Value', 'Price', 'Profit'],
         items.map(i => [
-          i.name, Components.formatCurrency(i.price),
+          i.name, i.type || '-', i.value || '-',
+          Components.formatCurrency(i.price),
           i.profit === null || i.profit === undefined ? '-' : Components.formatCurrency(i.profit)
         ]),
         'smz-stamp-papers'

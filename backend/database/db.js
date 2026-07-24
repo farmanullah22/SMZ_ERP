@@ -39,19 +39,29 @@ const productSchema = new mongoose.Schema({
   sale_price: { type: Number, required: true, default: 0 },
   quantity: { type: Number, default: 0 },
   reorder_level: { type: Number, default: 10 },
-  description: String
+  description: String,
+  imei: String,
+  barcode: String
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }, toJSON });
 
 const stampPaperSchema = new mongoose.Schema({
+  stamp_number: String,
+  type: String,
+  value: Number,
   name: { type: String, required: true },
   price: { type: Number, required: true },
-  profit: { type: Number, default: null }
+  profit: { type: Number, default: null },
+  customer_name: String,
+  mobile: String,
+  purpose: String,
+  documents: [String]
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }, toJSON });
 
 const customerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: String,
   phone: String,
+  cnic: String,
   address: String,
   notes: String,
   total_purchases: { type: Number, default: 0 },
@@ -143,6 +153,60 @@ const expenseSchema = new mongoose.Schema({
   expense_date: { type: Date, default: Date.now }
 }, { timestamps: { createdAt: 'created_at' }, toJSON });
 
+const serviceSchema = new mongoose.Schema({
+  application_number: { type: String, unique: true, sparse: true },
+  customer_name: { type: String, required: true },
+  mobile: String,
+  cnic: String,
+  service_type: { type: String, default: 'Birth Certificate' },
+  status: { type: String, default: 'pending', enum: ['pending', 'in_progress', 'completed'] },
+  fee: { type: Number, default: 0 },
+  notes: String,
+  documents: [String]
+}, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }, toJSON });
+
+const mobileTransactionSchema = new mongoose.Schema({
+  type: { type: String, required: true, enum: ['cash_in', 'cash_out'] },
+  provider: { type: String, required: true, enum: ['easypaisa', 'jazzcash', 'other'] },
+  customer_name: String,
+  mobile_number: String,
+  cnic: String,
+  amount: { type: Number, required: true },
+  commission: { type: Number, default: 0 },
+  net_amount: { type: Number, default: 0 },
+  fee: { type: Number, default: 0 },
+  description: String,
+  transaction_date: { type: Date, default: Date.now }
+}, { timestamps: { createdAt: 'created_at' }, toJSON });
+
+const rechargeSchema = new mongoose.Schema({
+  network: { type: String, required: true, enum: ['jazz', 'telenor', 'zong', 'ufone', 'other'] },
+  mobile_number: { type: String, required: true },
+  amount: { type: Number, required: true },
+  commission: { type: Number, default: 0 },
+  profit: { type: Number, default: 0 },
+  customer_name: String,
+  description: String,
+  recharge_date: { type: Date, default: Date.now }
+}, { timestamps: { createdAt: 'created_at' }, toJSON });
+
+const creditSchema = new mongoose.Schema({
+  customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
+  customer_name: { type: String, required: true },
+  mobile: String,
+  total_amount: { type: Number, required: true },
+  paid_amount: { type: Number, default: 0 },
+  due_date: Date,
+  status: { type: String, default: 'active', enum: ['active', 'partial', 'paid', 'overdue'] },
+  notes: String,
+  payments: [{
+    amount: { type: Number, required: true },
+    date: { type: Date, default: Date.now },
+    method: { type: String, default: 'cash' },
+    notes: String
+  }]
+}, { timestamps: { createdAt: 'created_at' }, toJSON });
+
 const User = mongoose.model('User', userSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Supplier = mongoose.model('Supplier', supplierSchema);
@@ -159,6 +223,10 @@ const Transaction = mongoose.model('Transaction', transactionSchema);
 const Setting = mongoose.model('Setting', settingSchema);
 const History = mongoose.model('History', historySchema);
 const Expense = mongoose.model('Expense', expenseSchema);
+const Service = mongoose.model('Service', serviceSchema);
+const MobileTransaction = mongoose.model('MobileTransaction', mobileTransactionSchema);
+const Recharge = mongoose.model('Recharge', rechargeSchema);
+const Credit = mongoose.model('Credit', creditSchema);
 
 async function initDatabase() {
   const db = mongoose.connection;
@@ -217,5 +285,9 @@ module.exports = {
   Transaction,
   Setting,
   History,
-  Expense
+  Expense,
+  Service,
+  MobileTransaction,
+  Recharge,
+  Credit
 };

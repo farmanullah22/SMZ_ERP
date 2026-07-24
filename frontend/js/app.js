@@ -104,10 +104,14 @@ const App = {
       case 'customers': await Customers.init(); break;
       case 'suppliers': await Suppliers.init(); break;
       case 'stampPapers': await StampPapers.init(); break;
-      case 'accounts': await Accounts.init(); break;
       case 'expenses': await Expenses.init(); break;
       case 'analytics': await Analytics.init(); break;
       case 'reports': await Reports.init(); break;
+      case 'services': await Services.init(); break;
+      case 'mobileTransactions': await MobileTransactions.init(); break;
+      case 'recharges': await Recharges.init(); break;
+      case 'credits': await Credits.init(); break;
+      case 'activityLog': await ActivityLog.init(); break;
       case 'websiteManage': await WebsiteManage.init(); break;
       case 'settings': await Settings.init(); break;
     }

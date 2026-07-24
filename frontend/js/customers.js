@@ -88,12 +88,12 @@ const Customers = {
   renderTable(customers) {
     if (customers.length === 0) return Components.emptyState('users', 'No Customers', 'Add customers to see them here');
     return Components.table(
-      ['Name', 'Email', 'Phone', 'Address', 'Total Purchases', 'Total Spent', 'Actions'],
+      ['Name', 'Phone', 'CNIC', 'Address', 'Purchases', 'Total Spent', 'Actions'],
       customers.map(c => {
         const row = [
           c.name,
-          c.email || '-',
           c.phone || '-',
+          c.cnic || '-',
           c.address || '-',
           c.total_purchases || 0,
           Components.formatCurrency(c.total_spent || 0),
@@ -123,6 +123,7 @@ const Customers = {
           <div class="input-group"><label>Email</label><input type="email" name="email" placeholder="email@example.com"></div>
           <div class="input-group"><label>Phone</label><input type="tel" name="phone" placeholder="03XX-XXXXXXX"></div>
         </div>
+        <div class="input-group"><label>CNIC</label><input type="text" name="cnic" placeholder="XXXXX-XXXXXXX-X"></div>
         <div class="input-group"><label>Address</label><textarea name="address" rows="2"></textarea></div>
         <div class="input-group"><label>Notes</label><textarea name="notes" rows="2"></textarea></div>
       </form>`, {
@@ -140,6 +141,7 @@ const Customers = {
           <div class="input-group"><label>Email</label><input type="email" name="email" value="${customer.email || ''}"></div>
           <div class="input-group"><label>Phone</label><input type="tel" name="phone" value="${customer.phone || ''}"></div>
         </div>
+        <div class="input-group"><label>CNIC</label><input type="text" name="cnic" value="${customer.cnic || ''}"></div>
         <div class="input-group"><label>Address</label><textarea name="address" rows="2">${customer.address || ''}</textarea></div>
         <div class="input-group"><label>Notes</label><textarea name="notes" rows="2">${customer.notes || ''}</textarea></div>
       </form>`, {
@@ -186,6 +188,7 @@ const Customers = {
           <div class="form-grid" style="text-align: left; max-width: 500px; margin: 0 auto;">
             <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Email</label><p>${customer.email || '-'}</p></div>
             <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Phone</label><p>${customer.phone || '-'}</p></div>
+            <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">CNIC</label><p>${customer.cnic || '-'}</p></div>
             <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Address</label><p>${customer.address || '-'}</p></div>
             <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Total Purchases</label><p>${customer.total_purchases || 0}</p></div>
             <div><label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Total Spent</label><p>${Components.formatCurrency(customer.total_spent || 0)}</p></div>

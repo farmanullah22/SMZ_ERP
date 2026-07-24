@@ -131,7 +131,7 @@ const API = {
       const query = new URLSearchParams(params).toString();
       return API.request(`/reports/accounts${query ? `?${query}` : ''}`);
     },
-    getHistory: () => API.request('/reports/history')
+    getHistory: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/reports/history${q ? `?${q}` : ''}`).then(r => r.history || []); }
   },
 
   analytics: {
@@ -156,6 +156,37 @@ const API = {
     getAll: () => API.request('/settings'),
     update: (key, value) => API.request('/settings', { method: 'PUT', body: JSON.stringify({ key, value }) }),
     backup: () => `${API.baseUrl}/settings/backup`
+  },
+
+  services: {
+    getAll: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/services${q ? `?${q}` : ''}`); },
+    getById: (id) => API.request(`/services/${id}`),
+    create: (data) => API.request('/services', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => API.request(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => API.request(`/services/${id}`, { method: 'DELETE' })
+  },
+
+  mobileTransactions: {
+    getAll: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/mobile-transactions${q ? `?${q}` : ''}`); },
+    create: (data) => API.request('/mobile-transactions', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id) => API.request(`/mobile-transactions/${id}`, { method: 'DELETE' }),
+    getStats: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/mobile-transactions/stats${q ? `?${q}` : ''}`); }
+  },
+
+  recharges: {
+    getAll: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/recharges${q ? `?${q}` : ''}`); },
+    create: (data) => API.request('/recharges', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id) => API.request(`/recharges/${id}`, { method: 'DELETE' }),
+    getStats: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/recharges/stats${q ? `?${q}` : ''}`); }
+  },
+
+  credits: {
+    getAll: (params = {}) => { const q = new URLSearchParams(params).toString(); return API.request(`/credits${q ? `?${q}` : ''}`); },
+    create: (data) => API.request('/credits', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => API.request(`/credits/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => API.request(`/credits/${id}`, { method: 'DELETE' }),
+    addPayment: (id, data) => API.request(`/credits/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+    getStats: () => API.request('/credits/stats')
   },
 
   website: {
