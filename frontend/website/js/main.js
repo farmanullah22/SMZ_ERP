@@ -74,6 +74,10 @@ const Website = {
       </div>
     `).join('');
 
+    const sl = c.heroSlider || {};
+    const sliderImages = sl.images || [];
+    const hasSlider = sliderImages.length > 0;
+
     document.getElementById('app').innerHTML = `
       <!-- Navbar -->
       <nav class="navbar" id="navbar">
@@ -113,10 +117,23 @@ const Website = {
 
       <main>
         <!-- Hero Section -->
-        <section class="hero" id="home">
-          <div class="hero-bg"${h.image ? ` style="background-image:url('${h.image}');background-size:cover;background-position:center;"` : ''}></div>
+        <section class="hero${hasSlider ? ' hero-with-slider' : ''}" id="home">
+          ${hasSlider ? `
+          <div class="hero-slider" id="heroSlider">
+            ${sliderImages.map((img, i) => `
+              <div class="hero-slide${i === 0 ? ' active' : ''}" style="background-image:url('${img}');" data-index="${i}">
+                <div class="hero-slide-overlay"></div>
+              </div>
+            `).join('')}
+            <button class="slider-arrow slider-arrow-prev" id="sliderPrev"><i class="fas fa-chevron-left"></i></button>
+            <button class="slider-arrow slider-arrow-next" id="sliderNext"><i class="fas fa-chevron-right"></i></button>
+            <div class="slider-dots">
+              ${sliderImages.map((_, i) => `<span class="slider-dot${i === 0 ? ' active' : ''}" data-slide="${i}"></span>`).join('')}
+            </div>
+          </div>
+          ` : `<div class="hero-bg"></div>`}
           <div class="container">
-            <div class="hero-content">
+            <div class="hero-content${hasSlider ? ' hero-content-overlay' : ''}">
               ${h.badge ? `<span class="hero-badge">${h.badge}</span>` : ''}
               <h1 class="hero-title">${h.heading || ''}</h1>
               ${h.subheading ? `<p class="hero-subtitle">${h.subheading}</p>` : ''}
@@ -316,6 +333,49 @@ const Website = {
       e.preventDefault();
       alert('Thank you for your message! Our team will get back to you shortly.');
     });
+
+    // Hero Slider
+    this.initSlider();
+  },
+
+  initSlider() {
+    const slider = document.getElementById('heroSlider');
+    if (!slider) return;
+    const slides = slider.querySelectorAll('.hero-slide');
+    const dots = slider.querySelectorAll('.slider-dot');
+    if (!slides.length) return;
+    let current = 0;
+    let interval;
+
+    function goToSlide(index) {
+      slides.forEach(s => s.classList.remove('active'));
+      dots.forEach(d => d.classList.remove('active'));
+      current = (index + slides.length) % slides.length;
+      slides[current].classList.add('active');
+      dots[current].classList.add('active');
+    }
+
+    function next() { goToSlide(current + 1); }
+    function prev() { goToSlide(current - 1); }
+
+    function startAuto() { interval = setInterval(next, 5000); }
+    function stopAuto() { clearInterval(interval); }
+
+    document.getElementById('sliderNext')?.addEventListener('click', () => { next(); stopAuto(); startAuto(); });
+    document.getElementById('sliderPrev')?.addEventListener('click', () => { prev(); stopAuto(); startAuto(); });
+
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        goToSlide(parseInt(dot.dataset.slide));
+        stopAuto();
+        startAuto();
+      });
+    });
+
+    slider.addEventListener('mouseenter', stopAuto);
+    slider.addEventListener('mouseleave', startAuto);
+
+    startAuto();
   },
 
   async searchStamp() {

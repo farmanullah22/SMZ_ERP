@@ -35,6 +35,7 @@ const WebsiteManage = {
       { id: 'cta', icon: 'bullhorn', label: 'CTA' },
       { id: 'contact', icon: 'envelope', label: 'Contact' },
       { id: 'site', icon: 'cog', label: 'Site Settings' },
+      { id: 'heroSlider', icon: 'images', label: 'Hero Slider' },
       { id: 'files', icon: 'folder', label: 'File Manager' }
     ];
 
@@ -83,6 +84,7 @@ const WebsiteManage = {
       case 'cta': this.renderSectionForm(ct, 'cta', ['heading', 'text', 'button1_text', 'button1_link', 'button2_text', 'button2_link']); break;
       case 'contact': this.renderSectionForm(ct, 'contact', ['tag', 'heading', 'text', 'phone', 'email', 'address']); break;
       case 'site': this.renderSiteSettings(ct); break;
+      case 'heroSlider': this.renderHeroSlider(ct); break;
       case 'files': this.renderFileManager(ct); break;
     }
   },
@@ -187,6 +189,98 @@ const WebsiteManage = {
       await API.websiteContent.updateSection(section, data);
       Modal.loading(false);
       Toast.success(`${section} section saved!`);
+      await this.loadContent();
+    } catch (error) {
+      Modal.loading(false);
+      Toast.error(error.message || 'Save failed');
+    }
+  },
+
+  renderHeroSlider(container) {
+    const s = this.content.heroSlider || {};
+    const images = s.images || [];
+    container.innerHTML = `
+      <div class="settings-section">
+        <h3 class="settings-section-title"><i class="fas fa-images"></i> Hero Slider Images</h3>
+        <p style="color:var(--text-muted);margin-bottom:16px;font-size:14px;">Upload images for the hero section slideshow. Images auto-rotate on the website.</p>
+        <div class="website-upload-area" style="padding:40px;text-align:center;border:2px dashed var(--border-color);border-radius:var(--radius-lg);background:var(--bg-tertiary);margin-bottom:20px;">
+          <i class="fas fa-images" style="font-size:48px;color:var(--primary);margin-bottom:16px;"></i>
+          <p style="margin-bottom:16px;">Upload slider images (JPEG, PNG, WebP)</p>
+          <input type="file" id="sliderImageInput" accept="image/*" multiple style="display:none">
+          <button class="btn btn-primary" onclick="document.getElementById('sliderImageInput').click()"><i class="fas fa-upload"></i> Select Images</button>
+        </div>
+        <div id="sliderUploadPreview" style="margin-bottom:16px;"></div>
+        <div id="sliderImagesList">
+          ${images.length === 0 ? '<div class="empty-state"><i class="fas fa-image" style="font-size:32px;color:var(--text-muted);margin-bottom:12px;display:block;"></i><p style="color:var(--text-muted);">No slider images yet. Upload some above.</p></div>' : `
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;">
+              ${images.map((img, i) => `
+                <div class="website-file-card" style="position:relative;">
+                  <img src="${img}" alt="Slide ${i+1}" style="width:100%;height:110px;object-fit:cover;border-radius:var(--radius-md);">
+                  <div class="website-file-info" style="padding:8px;"><div class="website-file-name">Slide ${i+1}</div></div>
+                  <div style="position:absolute;top:6px;right:6px;display:flex;gap:4px;">
+                    ${i > 0 ? `<button class="action-btn" onclick="WebsiteManage.moveSliderImage(${i}, -1)" title="Move Left"><i class="fas fa-chevron-left"></i></button>` : ''}
+                    ${i < images.length - 1 ? `<button class="action-btn" onclick="WebsiteManage.moveSliderImage(${i}, 1)" title="Move Right"><i class="fas fa-chevron-right"></i></button>` : ''}
+                    <button class="action-btn danger" onclick="WebsiteManage.removeSliderImage(${i})" title="Remove"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+        <div style="margin-top:20px;">
+          <button class="btn btn-primary" onclick="WebsiteManage.saveHeroSlider()"><i class="fas fa-save"></i> Save Slider</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('sliderImageInput')?.addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files.length) return;
+      const preview = document.getElementById('sliderUploadPreview');
+      preview.innerHTML = '<p style="margin-bottom:12px;color:var(--text-primary);"><i class="fas fa-spinner fa-spin"></i> Uploading...</p>';
+      const urls = [];
+      try {
+        for (const file of files) {
+          Modal.loading(true);
+          const res = await API.websiteContent.uploadImage(file);
+          if (res.url) urls.push(res.url);
+        }
+        Modal.loading(false);
+        if (urls.length) {
+          this.content.heroSlider = this.content.heroSlider || { images: [] };
+          this.content.heroSlider.images.push(...urls);
+          this.renderHeroSlider(container);
+          Toast.success(`${urls.length} image(s) uploaded`);
+        }
+      } catch (err) {
+        Modal.loading(false);
+        Toast.error('Upload failed');
+      }
+    });
+  },
+
+  moveSliderImage(index, direction) {
+    const s = this.content.heroSlider || {};
+    const images = s.images || [];
+    const target = index + direction;
+    if (target < 0 || target >= images.length) return;
+    [images[index], images[target]] = [images[target], images[index]];
+    this.renderHeroSlider(document.getElementById('websiteTabContent'));
+  },
+
+  removeSliderImage(index) {
+    const s = this.content.heroSlider || {};
+    const images = s.images || [];
+    images.splice(index, 1);
+    this.renderHeroSlider(document.getElementById('websiteTabContent'));
+  },
+
+  async saveHeroSlider() {
+    try {
+      Modal.loading(true);
+      const data = this.content.heroSlider || { images: [] };
+      await API.websiteContent.updateSection('heroSlider', data);
+      Modal.loading(false);
+      Toast.success('Hero slider saved!');
       await this.loadContent();
     } catch (error) {
       Modal.loading(false);

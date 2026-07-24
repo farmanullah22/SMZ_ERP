@@ -116,7 +116,8 @@ function getDefaultContent() {
       phone: '+92 300 1234567',
       email: 'info@smz.com',
       address: 'Lahore, Pakistan'
-    }
+    },
+    heroSlider: { images: [] }
   };
 }
 
@@ -133,7 +134,7 @@ const getManageContent = async (req, res) => {
 const updateSection = async (req, res) => {
   try {
     const { section } = req.params;
-    const allowedSections = ['site', 'hero', 'stampSearch', 'about', 'features', 'whyChoose', 'process', 'testimonials', 'cta', 'contact'];
+    const allowedSections = ['site', 'hero', 'stampSearch', 'about', 'features', 'whyChoose', 'process', 'testimonials', 'cta', 'contact', 'heroSlider'];
     if (!allowedSections.includes(section)) {
       return res.status(400).json({ error: 'Invalid section' });
     }
