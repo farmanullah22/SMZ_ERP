@@ -29,16 +29,11 @@ const Dashboard = {
   async loadStats() {
     try {
       const dateParams = this.getDateParams();
-      const [stats, accounts, stampPapers, expenses] = await Promise.all([
+      const [stats, stampPapers, expenses] = await Promise.all([
         API.sales.getStats(dateParams),
-        API.accounts.getAll().catch(() => []),
         API.stampPapers.getAll().catch(() => []),
         API.expenses.getAll({}).catch(() => ({ expenses: [], summary: { total: 0 } }))
       ]);
-
-      const totalCash = accounts.filter(a => a.account_type === 'cash').reduce((s, a) => s + (a.current_balance || 0), 0);
-      const totalBank = accounts.filter(a => a.account_type === 'bank').reduce((s, a) => s + (a.balance || 0), 0);
-      const totalBalance = totalCash + totalBank;
 
       const stampTotal = stampPapers.reduce((s, p) => s + (p.price || 0), 0);
       const stampProfit = stampPapers.reduce((s, p) => s + (p.profit || 0), 0);
@@ -82,7 +77,6 @@ const Dashboard = {
         <div class="stats-grid">
           ${Components.statCard('shopping-cart', 'Total Sales', Components.formatCurrency(stats.totalSales), `Today: ${Components.formatCurrency(stats.todaySales)}`, 'primary')}
           ${Components.statCard('chart-line', 'Total Profit', Components.formatCurrency(stats.totalProfit), `This Month: ${Components.formatCurrency(stats.monthProfit)}`, 'success')}
-          ${Components.statCard('wallet', 'Cash in Hand', Components.formatCurrency(totalCash), `Bank: ${Components.formatCurrency(totalBank)}`, 'info')}
           ${Components.statCard('truck', 'Purchases', Components.formatCurrency(stats.totalExpenses), `${stats.productCount} Products`, 'warning')}
         </div>
 
@@ -90,7 +84,6 @@ const Dashboard = {
           ${Components.statCard('file-signature', 'Stamp Papers', Components.formatCurrency(stampTotal), `Profit: ${Components.formatCurrency(stampProfit)}`, 'secondary')}
           ${Components.statCard('receipt', 'Op. Expenses', Components.formatCurrency(totalExpensesOp), `${expenseCount} Entries`, 'danger')}
           ${Components.statCard('boxes', 'Stock Value', Components.formatCurrency(stats.inventoryValue), `${stats.productCount} Items`, 'info')}
-          ${Components.statCard('balance-scale', 'Net Balance', Components.formatCurrency(totalBalance), 'Cash + Bank', 'primary')}
         </div>
 
         <div class="charts-grid">
