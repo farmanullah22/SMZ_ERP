@@ -45,7 +45,7 @@ const WebsiteManage = {
         <div class="page-actions">
           <button class="btn btn-secondary" onclick="WebsiteManage.resetContent()"><i class="fas fa-undo"></i> Reset Defaults</button>
           <button class="btn btn-secondary" onclick="WebsiteManage.refresh()"><i class="fas fa-sync-alt"></i> Refresh</button>
-          <a href="/website/" target="_blank" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> View Website</a>
+          <a href="/" target="_blank" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> View Website</a>
         </div>
       </div>
 

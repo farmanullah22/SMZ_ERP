@@ -9,8 +9,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend')));
-
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/sales', require('./routes/sales'));
@@ -33,14 +31,28 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve website pages
-app.use('/website', express.static(path.join(__dirname, '../frontend/website')));
-app.get('/website/*', (req, res) => {
+// Serve website static files at root
+app.use(express.static(path.join(__dirname, '../frontend/website')));
+// Serve dashboard shared assets (css, js, uploads)
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Website at root
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/website/index.html'));
 });
 
-app.get('*', (req, res) => {
+// Dashboard at /admin
+app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+app.get('/admin/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+// Keep /website/ as fallback alias
+app.use('/website', express.static(path.join(__dirname, '../frontend/website')));
+app.get('/website/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/website/index.html'));
 });
 
 app.use((err, req, res, next) => {

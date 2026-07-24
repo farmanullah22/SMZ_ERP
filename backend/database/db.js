@@ -236,7 +236,7 @@ async function initDatabase() {
   db.on('error', console.error.bind(console, 'MongoDB connection error:'));
   db.once('open', () => console.log('Connected to MongoDB'));
 
-  await mongoose.connect(MONGO_URI);
+  await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 15000 });
 
   const userCount = await User.countDocuments();
   if (userCount === 0) {
