@@ -970,7 +970,7 @@ a { text-decoration: none; color: inherit; }
   .hamburger { display: flex; }
 
   /* Hero */
-  .hero { padding-top: 100px; min-height: auto; display: block; }
+  .hero { padding-top: 100px; min-height: 50vh; display: block; }
   .hero-title { font-size: 30px; }
   .hero-subtitle { font-size: 16px; }
   .hero-content { padding: 40px 0 30px; }
