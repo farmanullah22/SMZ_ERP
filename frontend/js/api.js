@@ -156,6 +156,35 @@ const API = {
     getAll: () => API.request('/settings'),
     update: (key, value) => API.request('/settings', { method: 'PUT', body: JSON.stringify({ key, value }) }),
     backup: () => `${API.baseUrl}/settings/backup`
+  },
+
+  website: {
+    getFiles: () => API.request('/website/files'),
+    uploadFile: (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return fetch(`${API.baseUrl}/website/upload`, {
+        method: 'POST',
+        body: formData
+      }).then(r => r.json());
+    },
+    uploadMultiple: (files) => {
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+      return fetch(`${API.baseUrl}/website/upload-multiple`, {
+        method: 'POST',
+        body: formData
+      }).then(r => r.json());
+    },
+    uploadHero: (file) => {
+      const formData = new FormData();
+      formData.append('hero', file);
+      return fetch(`${API.baseUrl}/website/upload-hero`, {
+        method: 'POST',
+        body: formData
+      }).then(r => r.json());
+    },
+    deleteFile: (filename) => API.request(`/website/files/${encodeURIComponent(filename)}`, { method: 'DELETE' })
   }
 };
 

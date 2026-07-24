@@ -10,7 +10,7 @@ function postRequest(path, data) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
+        'Content-Length': Buffer.byteLength(body)  // Set the Content-Length header to the length of the request body
       }
     };
 

@@ -22,9 +22,16 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/website', require('./routes/website'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve website pages
+app.use('/website', express.static(path.join(__dirname, '../frontend/website')));
+app.get('/website/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/website/index.html'));
 });
 
 app.get('*', (req, res) => {

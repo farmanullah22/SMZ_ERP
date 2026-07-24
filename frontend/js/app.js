@@ -108,6 +108,7 @@ const App = {
       case 'expenses': await Expenses.init(); break;
       case 'analytics': await Analytics.init(); break;
       case 'reports': await Reports.init(); break;
+      case 'websiteManage': await WebsiteManage.init(); break;
       case 'settings': await Settings.init(); break;
     }
   },
