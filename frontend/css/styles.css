@@ -2432,3 +2432,49 @@ tbody tr:nth-child(3) .rank-badge { background: #cd7f32; }
   .website-files-grid { grid-template-columns: repeat(2, 1fr); }
   .website-tabs { flex-wrap: nowrap; }
 }
+
+.form-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+.form-label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: capitalize;
+}
+.array-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.array-fields {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.array-input {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 100px;
+  flex: 1;
+}
+.array-input:focus { border-color: var(--primary); outline: none; }
+.content-form .input-group { margin-bottom: 16px; }
+.content-form .input-group label { font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; display: block; text-transform: capitalize; }

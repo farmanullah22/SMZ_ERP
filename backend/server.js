@@ -27,6 +27,7 @@ app.use('/api/services', require('./routes/services'));
 app.use('/api/mobile-transactions', require('./routes/mobileTransactions'));
 app.use('/api/recharges', require('./routes/recharges'));
 app.use('/api/credits', require('./routes/credits'));
+app.use('/api/website-content', require('./routes/websiteContent'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

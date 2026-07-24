@@ -216,6 +216,14 @@ const API = {
       }).then(r => r.json());
     },
     deleteFile: (filename) => API.request(`/website/files/${encodeURIComponent(filename)}`, { method: 'DELETE' })
+  },
+
+  websiteContent: {
+    get: () => API.request('/website-content/manage'),
+    updateSection: (section, data) => API.request(`/website-content/section/${section}`, { method: 'PUT', body: JSON.stringify(data) }),
+    uploadImage: (file) => { const fd = new FormData(); fd.append('image', file); return fetch(`${API.baseUrl}/website-content/upload-image`, { method: 'POST', body: fd }).then(r => r.json()); },
+    searchStamp: (number) => API.request(`/website-content/search-stamp?number=${encodeURIComponent(number)}`),
+    reset: () => API.request('/website-content/reset', { method: 'POST' })
   }
 };
 
