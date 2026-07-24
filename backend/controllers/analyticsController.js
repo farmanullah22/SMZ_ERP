@@ -1,114 +1,158 @@
-const db = require('../database/db');
+const { Sale, SaleItem, Purchase, Product, Category } = require('../database/db');
 
-const getAnalyticsData = (req, res) => {
+const getAnalyticsData = async (req, res) => {
   try {
     const { startDate, endDate, period = 'monthly' } = req.query;
     const today = new Date().toISOString().split('T')[0];
     const dateFrom = startDate || '1970-01-01';
     const dateTo = endDate || today;
 
-    function withSalesDate(sql) {
-      return sql.replace('{{dateFilter}}', `DATE(sales.created_at) BETWEEN DATE('${dateFrom}') AND DATE('${dateTo}')`);
-    }
+    const dateFilter = {
+      created_at: { $gte: new Date(dateFrom), $lte: new Date(dateTo + 'T23:59:59.999Z') }
+    };
 
-    function withDate(sql) {
-      return sql.replace('{{dateFilter}}', `DATE(created_at) BETWEEN DATE('${dateFrom}') AND DATE('${dateTo}')`);
-    }
+    // 1. Sales by category
+    const salesByCategory = await SaleItem.aggregate([
+      {
+        $lookup: {
+          from: 'sales',
+          localField: 'sale',
+          foreignField: '_id',
+          as: 'saleData'
+        }
+      },
+      { $unwind: '$saleData' },
+      { $match: { 'saleData.created_at': dateFilter.created_at } },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'product',
+          foreignField: '_id',
+          as: 'productData'
+        }
+      },
+      { $unwind: { path: '$productData', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'productData.category',
+          foreignField: '_id',
+          as: 'categoryData'
+        }
+      },
+      { $unwind: { path: '$categoryData', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: '$categoryData._id',
+          category_name: { $first: { $ifNull: ['$categoryData.name', 'Uncategorized'] } },
+          total: { $sum: '$subtotal' }
+        }
+      },
+      { $sort: { total: -1 } }
+    ]);
 
-    // 1. Sales by category (for donut chart)
-    const salesByCategory = db.all(withSalesDate(`
-      SELECT c.name as category_name, COALESCE(SUM(si.subtotal), 0) as total
-      FROM sale_items si
-      JOIN sales ON si.sale_id = sales.id
-      LEFT JOIN products p ON si.product_id = p.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE {{dateFilter}}
-      GROUP BY c.id
-      ORDER BY total DESC
-    `));
+    // 2. Payment method breakdown
+    const paymentMethods = await Sale.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: { $ifNull: ['$payment_method', 'Other'] },
+          count: { $sum: 1 },
+          total: { $sum: '$total_amount' }
+        }
+      },
+      { $sort: { total: -1 } }
+    ]);
 
-    // 2. Payment method breakdown (for pie chart)
-    const paymentMethods = db.all(withSalesDate(`
-      SELECT COALESCE(payment_method, 'Other') as payment_method, COUNT(*) as count, SUM(total_amount) as total
-      FROM sales
-      WHERE {{dateFilter}}
-      GROUP BY payment_method
-      ORDER BY total DESC
-    `));
-
-    // 3. Time-series sales data (for line + bar charts)
-    let groupBy;
+    // 3. Time-series sales data
+    let groupFormat;
     switch (period) {
       case 'daily':
-        groupBy = "strftime('%Y-%m-%d', sales.created_at)";
+        groupFormat = { $dateToString: { format: '%Y-%m-%d', date: '$created_at' } };
         break;
       case 'weekly':
-        groupBy = "strftime('%Y-W%W', sales.created_at)";
+        groupFormat = { $dateToString: { format: '%Y-W%V', date: '$created_at' } };
         break;
       default:
-        groupBy = "strftime('%Y-%m', sales.created_at)";
+        groupFormat = { $dateToString: { format: '%Y-%m', date: '$created_at' } };
     }
 
-    const timeSeries = db.all(withSalesDate(`
-      SELECT ${groupBy} as period,
-        SUM(total_amount) as total_sales,
-        SUM(total_profit) as total_profit,
-        COUNT(*) as order_count
-      FROM sales
-      WHERE {{dateFilter}}
-      GROUP BY ${groupBy}
-      ORDER BY period ASC
-    `));
+    const timeSeries = await Sale.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: groupFormat,
+          total_sales: { $sum: '$total_amount' },
+          total_profit: { $sum: '$total_profit' },
+          order_count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
 
-    // 4. Top products by sales
-    const topProducts = db.all(withSalesDate(`
-      SELECT si.product_name, SUM(si.quantity) as qty, SUM(si.subtotal) as total
-      FROM sale_items si
-      JOIN sales ON si.sale_id = sales.id
-      WHERE {{dateFilter}}
-      GROUP BY si.product_name
-      ORDER BY total DESC
-      LIMIT 10
-    `));
+    // 4. Top products
+    const topProducts = await SaleItem.aggregate([
+      {
+        $lookup: {
+          from: 'sales',
+          localField: 'sale',
+          foreignField: '_id',
+          as: 'saleData'
+        }
+      },
+      { $unwind: '$saleData' },
+      { $match: { 'saleData.created_at': dateFilter.created_at } },
+      {
+        $group: {
+          _id: '$product_name',
+          qty: { $sum: '$quantity' },
+          total: { $sum: '$subtotal' }
+        }
+      },
+      { $sort: { total: -1 } },
+      { $limit: 10 }
+    ]);
 
     // 5. Day-of-week breakdown
-    const dayOfWeek = db.all(withSalesDate(`
-      SELECT CAST(strftime('%w', sales.created_at) AS INTEGER) as dow, SUM(total_amount) as total
-      FROM sales
-      WHERE {{dateFilter}}
-      GROUP BY dow
-      ORDER BY dow
-    `));
+    const dayOfWeek = await Sale.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: { $dayOfWeek: '$created_at' },
+          total: { $sum: '$total_amount' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const dayLabels = dayOfWeek.map(d => dayNames[d.dow]);
-    const dayTotals = dayOfWeek.map(d => d.total || 0);
+    const dayMap = {};
+    dayOfWeek.forEach(d => { dayMap[d._id - 1] = d.total; });
+    const dayLabels = dayNames;
+    const dayTotals = dayNames.map((_, i) => dayMap[i] || 0);
 
-    // 6. Summary stats
-    const summary = db.get(withSalesDate(`
-      SELECT
-        COUNT(*) as total_orders,
-        SUM(total_amount) as total_sales,
-        SUM(total_profit) as total_profit
-      FROM sales
-      WHERE {{dateFilter}}
-    `));
+    // 6. Summary
+    const summary = await Sale.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: null, total_orders: { $sum: 1 }, total_sales: { $sum: '$total_amount' }, total_profit: { $sum: '$total_profit' } } }
+    ]);
 
-    const purchaseTotal = db.get(withDate(`
-      SELECT SUM(total_amount) as total FROM purchases
-      WHERE {{dateFilter}}
-    `));
+    const purchaseTotal = await Purchase.aggregate([
+      { $match: dateFilter },
+      { $group: { _id: null, total: { $sum: '$total_amount' } } }
+    ]);
 
     res.json({
-      salesByCategory: salesByCategory.map(r => ({ label: r.category_name || 'Uncategorized', value: r.total || 0 })),
-      paymentMethods: paymentMethods.map(r => ({ label: r.payment_method, value: r.total || 0, count: r.count || 0 })),
-      timeSeries: timeSeries.map(r => ({ period: r.period, sales: r.total_sales || 0, profit: r.total_profit || 0, orders: r.order_count || 0 })),
-      topProducts: topProducts.map(r => ({ name: r.product_name, quantity: r.qty || 0, total: r.total || 0 })),
-      dayOfWeek: { labels: dayLabels.length ? dayLabels : dayNames, data: dayTotals.length ? dayTotals : [0, 0, 0, 0, 0, 0, 0] },
+      salesByCategory: salesByCategory.map(r => ({ label: r.category_name, value: r.total || 0 })),
+      paymentMethods: paymentMethods.map(r => ({ label: r._id, value: r.total || 0, count: r.count || 0 })),
+      timeSeries: timeSeries.map(r => ({ period: r._id, sales: r.total_sales || 0, profit: r.total_profit || 0, orders: r.order_count || 0 })),
+      topProducts: topProducts.map(r => ({ name: r._id, quantity: r.qty || 0, total: r.total || 0 })),
+      dayOfWeek: { labels: dayLabels, data: dayTotals },
       summary: {
-        totalOrders: summary?.total_orders || 0,
-        totalSales: summary?.total_sales || 0,
-        totalProfit: summary?.total_profit || 0,
-        totalExpenses: purchaseTotal?.total || 0
+        totalOrders: summary[0]?.total_orders || 0,
+        totalSales: summary[0]?.total_sales || 0,
+        totalProfit: summary[0]?.total_profit || 0,
+        totalExpenses: purchaseTotal[0]?.total || 0
       },
       period: { startDate: dateFrom, endDate: dateTo }
     });

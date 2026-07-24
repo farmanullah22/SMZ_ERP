@@ -1,5 +1,5 @@
 const Products = {
-  filters: { search: '', category: '', supplier: '', sort: 'name_asc' },
+  filters: { search: '', category: '', supplier: '', sort: 'name_asc', startDate: '', endDate: '' },
 
   async init() {
     await this.loadPage();
@@ -31,6 +31,14 @@ const Products = {
         </div>
 
         <div class="filter-bar">
+          <div class="filter-group">
+            <label>From</label>
+            <input type="date" id="prodStartDate" value="${this.filters.startDate}">
+          </div>
+          <div class="filter-group">
+            <label>To</label>
+            <input type="date" id="prodEndDate" value="${this.filters.endDate}">
+          </div>
           <input type="text" id="productSearch" placeholder="Search by name or SKU..." value="${this.filters.search}">
           <select id="productCategory">
             <option value="">All Categories</option>
@@ -93,10 +101,12 @@ const Products = {
       this.filters.category = document.getElementById('productCategory').value;
       this.filters.supplier = document.getElementById('productSupplier').value;
       this.filters.sort = document.getElementById('productSort').value;
+      this.filters.startDate = document.getElementById('prodStartDate').value;
+      this.filters.endDate = document.getElementById('prodEndDate').value;
       this.loadPage();
     }, 300);
 
-    ['productSearch', 'productCategory', 'productSupplier', 'productSort'].forEach(id => {
+    ['productSearch', 'productCategory', 'productSupplier', 'productSort', 'prodStartDate', 'prodEndDate'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', update);
       document.getElementById(id)?.addEventListener('change', update);
     });
@@ -105,13 +115,13 @@ const Products = {
   bindTableEvents(products) {
     document.querySelectorAll('[data-action="edit"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const id = parseInt(e.currentTarget.dataset.id);
+        const id = e.currentTarget.dataset.id;
         this.showEditModal(id);
       });
     });
     document.querySelectorAll('[data-action="delete"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const id = parseInt(e.currentTarget.dataset.id);
+        const id = e.currentTarget.dataset.id;
         this.confirmDelete(id);
       });
     });
@@ -135,7 +145,7 @@ const Products = {
           categories.map(c => `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border-color);">
               <span>${c.name}</span>
-              <button class="action-btn danger" onclick="Products.deleteCategory(${c.id})"><i class="fas fa-trash"></i></button>
+              <button class="action-btn danger" onclick="Products.deleteCategory('${c.id}')"><i class="fas fa-trash"></i></button>
             </div>
           `).join('')
         }
@@ -262,7 +272,7 @@ const Products = {
           <div class="input-group"><label>Description</label><textarea name="description" rows="2">${product.description || ''}</textarea></div>
         </form>`, {
         title: 'Edit Service',
-        footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Products.saveProduct(${id})"><i class="fas fa-save"></i> Update Service</button>`
+        footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Products.saveProduct('${id}')"><i class="fas fa-save"></i> Update Service</button>`
       });
     } catch (error) {
       Modal.loading(false);
@@ -279,8 +289,8 @@ const Products = {
     data.sale_price = parseFloat(data.sale_price) || 0;
     data.quantity = parseFloat(data.quantity) || 0;
     data.reorder_level = parseFloat(data.reorder_level) || 10;
-    data.category_id = data.category_id ? parseInt(data.category_id) : null;
-    data.supplier_id = data.supplier_id ? parseInt(data.supplier_id) : null;
+      data.category_id = data.category_id || null;
+      data.supplier_id = data.supplier_id || null;
 
     if (!data.name || data.name.trim() === '') {
       Toast.warning('Product name is required');

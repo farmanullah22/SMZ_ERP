@@ -2,34 +2,16 @@
   "name": "smz-system",
   "version": "1.0.0",
   "description": "Shop Management System - Inventory & Sales",
-  "main": "main.js",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "electron .",
-    "server": "node backend/server.js",
-    "pack": "electron-builder --win --dir",
-    "dist": "electron-builder --win"
-  },
-  "devDependencies": {
-    "electron": "^28.1.0",
-    "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.smz.shop",
-    "productName": "SMZ Shop Management",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "**/*"
-    ]
+    "start": "node backend/server.js",
+    "server": "node backend/server.js"
   },
   "dependencies": {
-    "sql.js": "^1.10.2",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.1",
-    "exceljs": "^4.4.0",
+    "express-async-errors": "^3.1.1",
+    "mongoose": "^8.0.0",
     "multer": "^1.4.5-lts.1"
   }
 }

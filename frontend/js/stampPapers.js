@@ -79,7 +79,7 @@ const StampPapers = {
         <div class="input-group"><label>Profit (Optional)</label><input type="number" name="profit" min="0" step="0.01" value="${item.profit ?? ''}"></div>
       </form>`, {
       title: 'Edit Stamp Paper',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="StampPapers.saveStampPaper(${item.id})"><i class="fas fa-save"></i> Update</button>`
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="StampPapers.saveStampPaper('${item.id}')"><i class="fas fa-save"></i> Update</button>`
     });
   },
 

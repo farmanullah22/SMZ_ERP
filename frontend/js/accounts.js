@@ -98,7 +98,25 @@ const Accounts = {
               View All
             </button>
           </div>
-          ${this.renderTransactions(transactions)}
+          <div class="filter-bar">
+            <div class="filter-group">
+              <label>From</label>
+              <input type="date" id="txnStartDate">
+            </div>
+            <div class="filter-group">
+              <label>To</label>
+              <input type="date" id="txnEndDate">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="Accounts.applyTxnFilter()">
+              <i class="fas fa-filter"></i> Apply
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="Accounts.clearTxnFilter()">
+              <i class="fas fa-times"></i> Clear
+            </button>
+          </div>
+          <div id="transactionsContainer">
+            ${this.renderTransactions(transactions)}
+          </div>
         </div>`;
 
       this.bindAccountEvents();
@@ -119,7 +137,7 @@ const Accounts = {
             <span class="account-type">Cash Account</span>
           </div>
           <div class="account-menu">
-            <button class="action-btn" onclick="Accounts.editCashAccount(${account.id})" title="Edit">
+            <button class="action-btn" onclick="Accounts.editCashAccount('${account.id}')" title="Edit">
               <i class="fas fa-edit"></i>
             </button>
           </div>
@@ -159,10 +177,10 @@ const Accounts = {
             <span class="account-type">${account.account_number || 'Bank Account'}</span>
           </div>
           <div class="account-menu">
-            <button class="action-btn" onclick="Accounts.showEditBankModal(${account.id})" title="Edit">
+            <button class="action-btn" onclick="Accounts.showEditBankModal('${account.id}')" title="Edit">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="action-btn" onclick="Accounts.deleteBank(${account.id})" title="Delete" style="color: rgba(255,255,255,0.7);">
+            <button class="action-btn" onclick="Accounts.deleteBank('${account.id}')" title="Delete" style="color: rgba(255,255,255,0.7);">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -271,7 +289,7 @@ const Accounts = {
         <div class="input-group"><label>Description</label><input type="text" name="description" id="cashDesc" placeholder="Description"></div>
       </form>`, {
       title: 'Edit Cash Account',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.saveCashAccount(${id})"><i class="fas fa-save"></i> Save</button>`,
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.saveCashAccount('${id}')"><i class="fas fa-save"></i> Save</button>`,
       onOpen: async () => {
         const accounts = await API.accounts.getAll();
         const acct = accounts.find(a => a.id === id && a.account_type === 'cash');
@@ -470,7 +488,7 @@ const Accounts = {
     let toId = 1;
 
     if (toType === 'bank') {
-      toId = parseInt(document.getElementById('transferBankAccount').value);
+      toId = document.getElementById('transferBankAccount').value;
       if (!toId) { Toast.warning('Please select a bank account'); return; }
     }
 
@@ -485,6 +503,29 @@ const Accounts = {
       Toast.success(`PKR ${amount.toLocaleString()} transferred successfully`);
       await this.loadPage();
     } catch (error) { Modal.loading(false); Toast.error(error.message); }
+  },
+
+  async loadTransactions() {
+    const startDate = document.getElementById('txnStartDate')?.value || '';
+    const endDate = document.getElementById('txnEndDate')?.value || '';
+    const params = { limit: 50 };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    try {
+      const transactions = await API.accounts.getTransactions(params);
+      const container = document.getElementById('transactionsContainer');
+      if (container) container.innerHTML = this.renderTransactions(transactions);
+    } catch { Toast.error('Failed to load transactions'); }
+  },
+
+  async applyTxnFilter() { await this.loadTransactions(); Toast.success('Filter applied'); },
+  async clearTxnFilter() {
+    const sd = document.getElementById('txnStartDate');
+    const ed = document.getElementById('txnEndDate');
+    if (sd) sd.value = '';
+    if (ed) ed.value = '';
+    await this.loadTransactions();
+    Toast.success('Filter cleared');
   },
 
   async showAllTransactions() {
@@ -553,10 +594,10 @@ const Accounts = {
         <div class="input-group"><label>Description</label><input type="text" name="description" id="editBankDesc"></div>
       </form>
       <div class="mt-4" style="border-top: 1px solid var(--border-color); padding-top: 16px;">
-        <button class="btn btn-danger" onclick="Accounts.deleteBank(${id})"><i class="fas fa-trash"></i> Delete Account</button>
+        <button class="btn btn-danger" onclick="Accounts.deleteBank('${id}')"><i class="fas fa-trash"></i> Delete Account</button>
       </div>`, {
       title: 'Edit Bank Account',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.updateBank(${id})"><i class="fas fa-save"></i> Update</button>`,
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Accounts.updateBank('${id}')"><i class="fas fa-save"></i> Update</button>`,
       onOpen: async () => {
         const accounts = await API.accounts.getAll();
         const account = accounts.find(a => a.id === id && a.account_type === 'bank');

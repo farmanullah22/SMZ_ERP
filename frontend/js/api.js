@@ -1,5 +1,5 @@
 const API = {
-  baseUrl: 'http://localhost:3000/api',
+  baseUrl: window.location.origin + '/api',
 
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
@@ -39,7 +39,10 @@ const API = {
     getCategories: () => API.request('/products/categories'),
     createCategory: (data) => API.request('/products/categories', { method: 'POST', body: JSON.stringify(data) }),
     deleteCategory: (id) => API.request(`/products/categories/${id}`, { method: 'DELETE' }),
-    getSuppliers: () => API.request('/products/suppliers'),
+    getSuppliers: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return API.request(`/products/suppliers${query ? `?${query}` : ''}`);
+    },
     createSupplier: (data) => API.request('/products/suppliers', { method: 'POST', body: JSON.stringify(data) }),
     updateSupplier: (id, data) => API.request(`/products/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteSupplier: (id) => API.request(`/products/suppliers/${id}`, { method: 'DELETE' }),
@@ -54,7 +57,10 @@ const API = {
     getById: (id) => API.request(`/sales/${id}`),
     create: (data) => API.request('/sales', { method: 'POST', body: JSON.stringify(data) }),
     delete: (id) => API.request(`/sales/${id}`, { method: 'DELETE' }),
-    getStats: () => API.request('/sales/stats'),
+    getStats: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return API.request(`/sales/stats${query ? `?${query}` : ''}`);
+    },
     getMonthly: (period = 'monthly', months = 12) => API.request(`/sales/monthly?period=${period}&months=${months}`)
   },
 

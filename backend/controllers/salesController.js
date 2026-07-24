@@ -1,4 +1,5 @@
-const db = require('../database/db');
+const mongoose = require('mongoose');
+const { Sale, SaleItem, Product, Customer, CashAccount, Transaction, addHistory } = require('../database/db');
 
 const generateInvoiceNumber = () => {
   const date = new Date();
@@ -7,100 +8,98 @@ const generateInvoiceNumber = () => {
   return `${prefix}-${random}`;
 };
 
-const getAllSales = (req, res) => {
+const getAllSales = async (req, res) => {
   try {
     const { startDate, endDate, customer, search } = req.query;
-    let query = `
-      SELECT s.*, c.name as customer_name,
-        (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.id) as items_count
-      FROM sales s
-      LEFT JOIN customers c ON s.customer_id = c.id
-      WHERE 1=1
-    `;
-    const params = [];
-
-    if (startDate) {
-      query += ' AND DATE(s.created_at) >= DATE(?)';
-      params.push(startDate);
-    }
-
-    if (endDate) {
-      query += ' AND DATE(s.created_at) <= DATE(?)';
-      params.push(endDate);
-    }
-
-    if (customer && customer !== 'all') {
-      query += ' AND s.customer_id = ?';
-      params.push(parseInt(customer));
-    }
-
+    const match = {};
+    if (startDate) match.created_at = { ...match.created_at, $gte: new Date(startDate) };
+    if (endDate) match.created_at = { ...match.created_at, $lte: new Date(endDate) };
+    if (customer && customer !== 'all') match.customer = new mongoose.Types.ObjectId(customer);
     if (search) {
-      query += ' AND (s.invoice_number LIKE ? OR c.name LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      match.$or = [
+        { invoice_number: { $regex: search, $options: 'i' } },
+        { 'customer.name': { $regex: search, $options: 'i' } }
+      ];
     }
-
-    query += ' ORDER BY s.created_at DESC';
-
-    const sales = db.all(query, params);
-    res.json(sales);
+    const sales = await Sale.aggregate([
+      {
+        $lookup: {
+          from: 'customers',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer'
+        }
+      },
+      { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+      { $match: match },
+      {
+        $lookup: {
+          from: 'saleitems',
+          localField: '_id',
+          foreignField: 'sale',
+          as: 'items'
+        }
+      },
+      {
+        $addFields: {
+          items_count: { $size: '$items' },
+          customer_name: '$customer.name'
+        }
+      },
+      { $project: { items: 0, customer: 0, __v: 0 } },
+      { $sort: { created_at: -1 } }
+    ]);
+    const result = sales.map(s => {
+      const { _id, ...rest } = s;
+      return { id: _id.toString(), ...rest };
+    });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getSale = (req, res) => {
+const getSale = async (req, res) => {
   try {
-    const sale = db.get(`
-      SELECT s.*, c.name as customer_name, c.phone as customer_phone
-      FROM sales s
-      LEFT JOIN customers c ON s.customer_id = c.id
-      WHERE s.id = ?
-    `, [parseInt(req.params.id)]);
-    
-    if (!sale) {
-      return res.status(404).json({ error: 'Sale not found' });
-    }
-
-    const items = db.all('SELECT * FROM sale_items WHERE sale_id = ?', [parseInt(req.params.id)]);
-    res.json({ ...sale, items });
+    const sale = await Sale.findById(req.params.id).populate('customer', 'name phone');
+    if (!sale) return res.status(404).json({ error: 'Sale not found' });
+    const items = await SaleItem.find({ sale: sale._id });
+    res.json({
+      ...sale.toJSON(),
+      customer_name: sale.customer?.name || null,
+      customer_phone: sale.customer?.phone || null,
+      items
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const createSale = (req, res) => {
+const createSale = async (req, res) => {
   try {
     const { customer_id, items, payment_method = 'cash' } = req.body;
-
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'No items in sale' });
-    }
+    if (!items || items.length === 0) return res.status(400).json({ error: 'No items in sale' });
 
     const invoiceNumber = generateInvoiceNumber();
     let subtotal = 0;
     let totalProfit = 0;
     const processedItems = [];
+    const productUpdates = [];
 
     for (const item of items) {
-      const product = db.get('SELECT * FROM products WHERE id = ?', [item.product_id]);
-      if (!product) {
-        return res.status(400).json({ error: `Product ${item.product_id} not found` });
-      }
-
+      const product = await Product.findById(item.product_id);
+      if (!product) return res.status(400).json({ error: `Product ${item.product_id} not found` });
       if (product.quantity < item.quantity) {
-        return res.status(400).json({ 
-          error: `Insufficient stock for ${product.name}. Available: ${product.quantity}` 
-        });
+        return res.status(400).json({ error: `Insufficient stock for ${product.name}. Available: ${product.quantity}` });
       }
 
       const itemSubtotal = item.quantity * item.sale_price;
       const itemProfit = (item.sale_price - product.cost_price) * item.quantity;
-
       subtotal += itemSubtotal;
       totalProfit += itemProfit;
 
       processedItems.push({
-        product_id: item.product_id,
+        product: product._id,
         product_name: product.name,
         quantity: item.quantity,
         cost_price: product.cost_price,
@@ -109,167 +108,183 @@ const createSale = (req, res) => {
         profit: itemProfit
       });
 
-      db.run('UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-        [item.quantity, item.product_id]);
+      productUpdates.push(
+        Product.findByIdAndUpdate(product._id, { $inc: { quantity: -item.quantity } })
+      );
     }
 
-    const saleResult = db.run(`
-      INSERT INTO sales (invoice_number, customer_id, subtotal, total_amount, total_profit, payment_method)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [invoiceNumber, customer_id || null, subtotal, subtotal, totalProfit, payment_method]);
+    const sale = await Sale.create({
+      invoice_number: invoiceNumber,
+      customer: customer_id || null,
+      subtotal,
+      total_amount: subtotal,
+      total_profit: totalProfit,
+      payment_method
+    });
 
-    const saleId = saleResult.lastInsertRowid;
-
+    const saleId = sale._id;
     for (const item of processedItems) {
-      db.run(`
-        INSERT INTO sale_items (sale_id, product_id, product_name, quantity, cost_price, sale_price, subtotal, profit)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        saleId, item.product_id, item.product_name, item.quantity,
-        item.cost_price, item.sale_price, item.subtotal, item.profit
-      ]);
+      await SaleItem.create({ sale: saleId, ...item });
     }
+
+    await Promise.all(productUpdates);
 
     if (customer_id) {
-      db.run('UPDATE customers SET total_purchases = total_purchases + 1, total_spent = total_spent + ? WHERE id = ?',
-        [subtotal, customer_id]);
+      await Customer.findByIdAndUpdate(customer_id, {
+        $inc: { total_purchases: 1, total_spent: subtotal }
+      });
     }
 
-    db.run('UPDATE cash_accounts SET current_balance = current_balance + ? WHERE id = 1', [subtotal]);
+    await CashAccount.findByIdAndUpdate('000000000000000000000000', { $inc: { current_balance: subtotal } });
+    const cashAccount = await CashAccount.findOne({});
+    if (cashAccount) {
+      await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: subtotal } });
+    }
 
-    db.run(`
-      INSERT INTO transactions (type, category, account_type, account_id, amount, description, reference_id, reference_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['credit', 'sale', 'cash', 1, subtotal, `Sale Invoice: ${invoiceNumber}`, saleId, 'sale']);
+    await Transaction.create({
+      type: 'credit', category: 'sale', account_type: 'cash',
+      account_id: cashAccount?._id || null, amount: subtotal,
+      description: `Sale Invoice: ${invoiceNumber}`,
+      reference_id: saleId, reference_type: 'sale'
+    });
 
     addHistory('CREATE', 'sale', saleId, `Created sale: ${invoiceNumber} - PKR ${subtotal.toLocaleString()}`);
 
-    const sale = db.get('SELECT * FROM sales WHERE id = ?', [saleId]);
-    const saleItems = db.all('SELECT * FROM sale_items WHERE sale_id = ?', [saleId]);
-
-    res.status(201).json({ ...sale, items: saleItems });
+    const saleItems = await SaleItem.find({ sale: saleId });
+    res.status(201).json({ ...sale.toJSON(), items: saleItems });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const deleteSale = (req, res) => {
+const deleteSale = async (req, res) => {
   try {
     const { id } = req.params;
-    const sale = db.get('SELECT * FROM sales WHERE id = ?', [parseInt(id)]);
+    const sale = await Sale.findById(id);
+    if (!sale) return res.status(404).json({ error: 'Sale not found' });
 
-    if (!sale) {
-      return res.status(404).json({ error: 'Sale not found' });
-    }
-
-    const items = db.all('SELECT * FROM sale_items WHERE sale_id = ?', [parseInt(id)]);
+    const items = await SaleItem.find({ sale: sale._id });
 
     for (const item of items) {
-      db.run('UPDATE products SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-        [item.quantity, item.product_id]);
+      if (item.product) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { quantity: item.quantity } });
+      }
     }
 
-    if (sale.customer_id) {
-      db.run('UPDATE customers SET total_purchases = total_purchases - 1, total_spent = total_spent - ? WHERE id = ?',
-        [sale.total_amount, sale.customer_id]);
+    if (sale.customer) {
+      await Customer.findByIdAndUpdate(sale.customer, {
+        $inc: { total_purchases: -1, total_spent: -sale.total_amount }
+      });
     }
 
-    db.run('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE id = 1', [sale.total_amount]);
+    const cashAccount = await CashAccount.findOne({});
+    if (cashAccount) {
+      await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: -sale.total_amount } });
+    }
 
-    db.run('DELETE FROM transactions WHERE reference_id = ? AND reference_type = ?', [parseInt(id), 'sale']);
-    db.run('DELETE FROM sale_items WHERE sale_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM sales WHERE id = ?', [parseInt(id)]);
+    await Transaction.deleteMany({ reference_id: sale._id, reference_type: 'sale' });
+    await SaleItem.deleteMany({ sale: sale._id });
+    await Sale.findByIdAndDelete(id);
 
-    addHistory('DELETE', 'sale', parseInt(id), `Deleted sale: ${sale.invoice_number}`);
-
+    addHistory('DELETE', 'sale', id, `Deleted sale: ${sale.invoice_number}`);
     res.json({ message: 'Sale deleted and stock restored' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getSalesStats = (req, res) => {
+const getSalesStats = async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const { startDate, endDate } = req.query;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const totalSales = db.get('SELECT SUM(total_amount) as total FROM sales') || { total: 0 };
-    const totalProfit = db.get('SELECT SUM(total_profit) as total FROM sales') || { total: 0 };
-    
-    const todaySales = db.get("SELECT SUM(total_amount) as total, SUM(total_profit) as profit FROM sales WHERE DATE(created_at) = DATE(?)", [today]) || { total: 0, profit: 0 };
-    const monthSales = db.get('SELECT SUM(total_amount) as total, SUM(total_profit) as profit FROM sales WHERE DATE(created_at) >= ?', [startOfMonth]) || { total: 0, profit: 0 };
-    
-    const totalExpenses = db.get('SELECT SUM(total_amount) as total FROM purchases') || { total: 0 };
-    const inventoryValue = db.get('SELECT SUM(quantity * cost_price) as total FROM products') || { total: 0 };
-    
-    const productCount = db.get('SELECT COUNT(*) as count FROM products') || { count: 0 };
-    const lowStockCount = db.get('SELECT COUNT(*) as count FROM products WHERE quantity <= reorder_level') || { count: 0 };
+    const dateFilter = {};
+    if (startDate) dateFilter.created_at = { ...dateFilter.created_at, $gte: new Date(startDate) };
+    if (endDate) dateFilter.created_at = { ...dateFilter.created_at, $lte: new Date(endDate) };
+
+    const hasDateRange = startDate || endDate;
+
+    const totalSales = await Sale.aggregate(
+      hasDateRange ? [{ $match: dateFilter }, { $group: { _id: null, total: { $sum: '$total_amount' } } }]
+                   : [{ $group: { _id: null, total: { $sum: '$total_amount' } } }]
+    );
+    const totalProfit = await Sale.aggregate(
+      hasDateRange ? [{ $match: dateFilter }, { $group: { _id: null, total: { $sum: '$total_profit' } } }]
+                   : [{ $group: { _id: null, total: { $sum: '$total_profit' } } }]
+    );
+    const todaySales = await Sale.aggregate([
+      { $match: { created_at: { $gte: today } } },
+      { $group: { _id: null, total: { $sum: '$total_amount' }, profit: { $sum: '$total_profit' } } }
+    ]);
+    const monthSales = await Sale.aggregate([
+      { $match: { created_at: { $gte: startOfMonth } } },
+      { $group: { _id: null, total: { $sum: '$total_amount' }, profit: { $sum: '$total_profit' } } }
+    ]);
+    const totalExpenses = await mongoose.model('Purchase').aggregate(
+      hasDateRange ? [{ $match: dateFilter }, { $group: { _id: null, total: { $sum: '$total_amount' } } }]
+                   : [{ $group: { _id: null, total: { $sum: '$total_amount' } } }]
+    );
+    const inventoryValue = await Product.aggregate([
+      { $group: { _id: null, total: { $sum: { $multiply: ['$quantity', '$cost_price'] } } } }
+    ]);
+    const productCount = await Product.countDocuments();
+    const lowStockCount = await Product.countDocuments({ $expr: { $lte: ['$quantity', '$reorder_level'] } });
 
     res.json({
-      totalSales: totalSales.total || 0,
-      totalProfit: totalProfit.total || 0,
-      todaySales: todaySales.total || 0,
-      todayProfit: todaySales.profit || 0,
-      monthSales: monthSales.total || 0,
-      monthProfit: monthSales.profit || 0,
-      totalExpenses: totalExpenses.total || 0,
-      inventoryValue: inventoryValue.total || 0,
-      productCount: productCount.count || 0,
-      lowStockCount: lowStockCount.count || 0
+      totalSales: totalSales[0]?.total || 0,
+      totalProfit: totalProfit[0]?.total || 0,
+      todaySales: todaySales[0]?.total || 0,
+      todayProfit: todaySales[0]?.profit || 0,
+      monthSales: monthSales[0]?.total || 0,
+      monthProfit: monthSales[0]?.profit || 0,
+      totalExpenses: totalExpenses[0]?.total || 0,
+      inventoryValue: inventoryValue[0]?.total || 0,
+      productCount,
+      lowStockCount
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getMonthlySalesData = (req, res) => {
+const getMonthlySalesData = async (req, res) => {
   try {
     const { period = 'monthly', months = 12 } = req.query;
-    
-    let dateFormat, groupBy;
+    const numMonths = parseInt(months);
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - numMonths);
+
+    let groupFormat;
     switch (period) {
       case 'daily':
-        dateFormat = '%Y-%m-%d';
-        groupBy = "strftime('%Y-%m-%d', created_at)";
+        groupFormat = { $dateToString: { format: '%Y-%m-%d', date: '$created_at' } };
         break;
       case 'weekly':
-        dateFormat = '%Y-W%W';
-        groupBy = "strftime('%Y-W%W', created_at)";
+        groupFormat = { $dateToString: { format: '%Y-W%V', date: '$created_at' } };
         break;
       default:
-        dateFormat = '%Y-%m';
-        groupBy = "strftime('%Y-%m', created_at)";
+        groupFormat = { $dateToString: { format: '%Y-%m', date: '$created_at' } };
     }
 
-    const data = db.all(`
-      SELECT 
-        ${groupBy} as period,
-        SUM(total_amount) as total_sales,
-        SUM(total_profit) as total_profit,
-        COUNT(*) as order_count
-      FROM sales
-      WHERE created_at >= date('now', '-${parseInt(months)} months')
-      GROUP BY ${groupBy}
-      ORDER BY period ASC
-    `);
+    const data = await Sale.aggregate([
+      { $match: { created_at: { $gte: startDate } } },
+      {
+        $group: {
+          _id: groupFormat,
+          total_sales: { $sum: '$total_amount' },
+          total_profit: { $sum: '$total_profit' },
+          order_count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $project: { period: '$_id', total_sales: 1, total_profit: 1, order_count: 1, _id: 0 } }
+    ]);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-function addHistory(actionType, entityType, entityId, description) {
-  db.run(`
-    INSERT INTO history (action_type, entity_type, entity_id, description)
-    VALUES (?, ?, ?, ?)
-  `, [actionType, entityType, entityId, description]);
-}
-
-module.exports = {
-  getAllSales,
-  getSale,
-  createSale,
-  deleteSale,
-  getSalesStats,
-  getMonthlySalesData
-};
+module.exports = { getAllSales, getSale, createSale, deleteSale, getSalesStats, getMonthlySalesData };

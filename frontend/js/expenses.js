@@ -214,10 +214,10 @@ const Expenses = {
                   </td>
                   <td class="text-center">
                     <div class="actions">
-                      <button class="btn-icon btn-icon-edit" title="Edit" onclick="Expenses.showEditModal(${e.id})">
+                      <button class="btn-icon btn-icon-edit" title="Edit" onclick="Expenses.showEditModal('${e.id}')">
                         <i class="fas fa-edit"></i>
                       </button>
-                      <button class="btn-icon btn-icon-delete" title="Delete" onclick="Expenses.deleteExpense(${e.id})">
+                      <button class="btn-icon btn-icon-delete" title="Delete" onclick="Expenses.deleteExpense('${e.id}')">
                         <i class="fas fa-trash"></i>
                       </button>
                     </div>

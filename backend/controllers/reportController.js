@@ -1,44 +1,32 @@
-const db = require('../database/db');
+const { Sale, Purchase, Product, Customer, Supplier, Transaction, History, CashAccount, BankAccount } = require('../database/db');
 
-const getSalesReport = (req, res) => {
+const getSalesReport = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const today = new Date().toISOString().split('T')[0];
-    
-    let dateFilter = "1=1";
-    const params = [];
-
+    const filter = {};
     if (startDate && endDate) {
-      dateFilter = "DATE(s.created_at) BETWEEN DATE(?) AND DATE(?)";
-      params.push(startDate, endDate);
+      filter.created_at = { $gte: new Date(startDate), $lte: new Date(endDate) };
     } else if (startDate) {
-      dateFilter = "DATE(s.created_at) >= DATE(?)";
-      params.push(startDate);
+      filter.created_at = { $gte: new Date(startDate) };
     } else if (endDate) {
-      dateFilter = "DATE(s.created_at) <= DATE(?)";
-      params.push(endDate);
+      filter.created_at = { $lte: new Date(endDate) };
     }
 
-    const sales = db.all(`
-      SELECT s.*, c.name as customer_name
-      FROM sales s
-      LEFT JOIN customers c ON s.customer_id = c.id
-      WHERE ${dateFilter}
-      ORDER BY s.created_at DESC
-    `, params);
+    const sales = await Sale.find(filter).populate('customer', 'name').sort({ created_at: -1 });
+    const result = sales.map(s => ({
+      ...s.toJSON(),
+      customer_name: s.customer?.name || null
+    }));
 
-    const summary = db.get(`
-      SELECT 
-        COUNT(*) as total_orders,
-        SUM(total_amount) as total_sales,
-        SUM(total_profit) as total_profit
-      FROM sales
-      WHERE ${dateFilter}
-    `, params);
+    const summary = await Sale.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total_orders: { $sum: 1 }, total_sales: { $sum: '$total_amount' }, total_profit: { $sum: '$total_profit' } } }
+    ]);
 
     res.json({
-      sales,
-      summary: summary || { total_orders: 0, total_sales: 0, total_profit: 0 },
+      sales: result,
+      summary: summary[0] || { total_orders: 0, total_sales: 0, total_profit: 0 },
       period: { startDate: startDate || 'all', endDate: endDate || today }
     });
   } catch (error) {
@@ -46,38 +34,34 @@ const getSalesReport = (req, res) => {
   }
 };
 
-const getProfitLossReport = (req, res) => {
+const getProfitLossReport = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const today = new Date().toISOString().split('T')[0];
-    
-    let dateFilter = "1=1";
-    const params = [];
-
+    const filter = {};
     if (startDate && endDate) {
-      dateFilter = "DATE(created_at) BETWEEN DATE(?) AND DATE(?)";
-      params.push(startDate, endDate);
+      filter.created_at = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
 
-    const salesData = db.get(`
-      SELECT 
-        SUM(total_amount) as total_revenue,
-        SUM(total_profit) as gross_profit
-      FROM sales
-      WHERE ${dateFilter}
-    `, params);
+    const salesData = await Sale.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total_revenue: { $sum: '$total_amount' }, gross_profit: { $sum: '$total_profit' } } }
+    ]);
 
-    const purchasesData = db.get(`
-      SELECT SUM(total_amount) as total_expenses
-      FROM purchases
-      WHERE ${dateFilter}
-    `, params);
+    const purchasesData = await Purchase.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total_expenses: { $sum: '$total_amount' } } }
+    ]);
+
+    const totalRevenue = salesData[0]?.total_revenue || 0;
+    const grossProfit = salesData[0]?.gross_profit || 0;
+    const totalExpenses = purchasesData[0]?.total_expenses || 0;
 
     res.json({
-      totalRevenue: salesData?.total_revenue || 0,
-      grossProfit: salesData?.gross_profit || 0,
-      totalExpenses: purchasesData?.total_expenses || 0,
-      netProfit: (salesData?.gross_profit || 0) - (purchasesData?.total_expenses || 0),
+      totalRevenue,
+      grossProfit,
+      totalExpenses,
+      netProfit: grossProfit - totalExpenses,
       period: { startDate: startDate || 'all', endDate: endDate || today }
     });
   } catch (error) {
@@ -85,173 +69,136 @@ const getProfitLossReport = (req, res) => {
   }
 };
 
-const getInventoryReport = (req, res) => {
+const getInventoryReport = async (req, res) => {
   try {
-    const products = db.all(`
-      SELECT p.*, 
-             c.name as category_name,
-             s.company_name as supplier_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      ORDER BY p.name ASC
-    `);
+    const products = await Product.find({}).populate('category', 'name').populate('supplier', 'company_name').sort('name');
+    const result = products.map(p => ({
+      ...p.toJSON(),
+      category_name: p.category?.name || null,
+      supplier_name: p.supplier?.company_name || null
+    }));
 
     const summary = {
-      totalProducts: products.length,
-      totalQuantity: products.reduce((sum, p) => sum + p.quantity, 0),
-      totalValue: products.reduce((sum, p) => sum + (p.quantity * p.cost_price), 0),
-      totalRetail: products.reduce((sum, p) => sum + (p.quantity * p.sale_price), 0),
-      lowStockCount: products.filter(p => p.quantity <= p.reorder_level).length,
-      outOfStockCount: products.filter(p => p.quantity === 0).length
+      totalProducts: result.length,
+      totalQuantity: result.reduce((sum, p) => sum + p.quantity, 0),
+      totalValue: result.reduce((sum, p) => sum + (p.quantity * p.cost_price), 0),
+      totalRetail: result.reduce((sum, p) => sum + (p.quantity * p.sale_price), 0),
+      lowStockCount: result.filter(p => p.quantity <= p.reorder_level).length,
+      outOfStockCount: result.filter(p => p.quantity === 0).length
     };
 
-    res.json({ products, summary });
+    res.json({ products: result, summary });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getCustomerReport = (req, res) => {
+const getCustomerReport = async (req, res) => {
   try {
-    const customers = db.all(`
-      SELECT c.*, 
-             COUNT(s.id) as purchase_count,
-             SUM(s.total_amount) as total_spent
-      FROM customers c
-      LEFT JOIN sales s ON c.id = s.customer_id
-      GROUP BY c.id
-      ORDER BY total_spent DESC
-    `);
-
-    const summary = {
-      totalCustomers: customers.length,
-      totalRevenue: customers.reduce((sum, c) => sum + (c.total_spent || 0), 0)
-    };
-
-    res.json({ customers, summary });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getSupplierReport = (req, res) => {
-  try {
-    const suppliers = db.all(`
-      SELECT s.*, 
-             COUNT(p.id) as product_count,
-             COUNT(pur.id) as purchase_count,
-             SUM(pur.total_amount) as total_purchased
-      FROM suppliers s
-      LEFT JOIN products p ON s.id = p.supplier_id
-      LEFT JOIN purchases pur ON s.id = pur.supplier_id
-      GROUP BY s.id
-      ORDER BY total_purchased DESC
-    `);
-
-    const summary = {
-      totalSuppliers: suppliers.length,
-      totalPurchased: suppliers.reduce((sum, s) => sum + (s.total_purchased || 0), 0)
-    };
-
-    res.json({ suppliers, summary });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getPurchaseReport = (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const today = new Date().toISOString().split('T')[0];
-    
-    let dateFilter = "1=1";
-    const params = [];
-
-    if (startDate && endDate) {
-      dateFilter = "DATE(p.created_at) BETWEEN DATE(?) AND DATE(?)";
-      params.push(startDate, endDate);
-    }
-
-    const purchases = db.all(`
-      SELECT p.*, s.company_name as supplier_name
-      FROM purchases p
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE ${dateFilter}
-      ORDER BY p.created_at DESC
-    `, params);
-
-    const summary = db.get(`
-      SELECT 
-        COUNT(*) as total_orders,
-        SUM(total_amount) as total_amount
-      FROM purchases
-      WHERE ${dateFilter}
-    `, params);
-
-    res.json({
-      purchases,
-      summary: summary || { total_orders: 0, total_amount: 0 },
-      period: { startDate: startDate || 'all', endDate: endDate || today }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getAccountsReport = (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const today = new Date().toISOString().split('T')[0];
-
-    let dateFilter = '1=1';
-    const params = [];
-
-    if (startDate && endDate) {
-      dateFilter = 'DATE(t.created_at) BETWEEN DATE(?) AND DATE(?)';
-      params.push(startDate, endDate);
-    } else if (startDate) {
-      dateFilter = 'DATE(t.created_at) >= DATE(?)';
-      params.push(startDate);
-    } else if (endDate) {
-      dateFilter = 'DATE(t.created_at) <= DATE(?)';
-      params.push(endDate);
-    }
-
-    const transactions = db.all(`
-      SELECT t.*,
-        CASE
-          WHEN t.account_type = 'cash' THEN ca.name
-          WHEN t.account_type = 'bank' THEN ba.name
-          ELSE 'Account'
-        END as account_name
-      FROM transactions t
-      LEFT JOIN cash_accounts ca ON t.account_type = 'cash' AND t.account_id = ca.id
-      LEFT JOIN bank_accounts ba ON t.account_type = 'bank' AND t.account_id = ba.id
-      WHERE ${dateFilter}
-      ORDER BY t.created_at DESC
-    `, params);
-
-    const summary = db.get(`
-      SELECT
-        COUNT(*) as total_transactions,
-        SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as total_credit,
-        SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END) as total_debit,
-        SUM(CASE WHEN type = 'transfer' THEN amount ELSE 0 END) as total_transfer,
-        SUM(CASE WHEN profit IS NOT NULL THEN profit ELSE 0 END) as total_profit
-      FROM transactions t
-      WHERE ${dateFilter}
-    `, params);
-
-    res.json({
-      transactions,
-      summary: summary || {
-        total_transactions: 0,
-        total_credit: 0,
-        total_debit: 0,
-        total_transfer: 0,
-        total_profit: 0
+    const customers = await Customer.aggregate([
+      {
+        $lookup: {
+          from: 'sales',
+          localField: '_id',
+          foreignField: 'customer',
+          as: 'sales'
+        }
       },
+      {
+        $addFields: {
+          purchase_count: { $size: '$sales' },
+          total_spent: { $sum: '$sales.total_amount' }
+        }
+      },
+      { $project: { sales: 0 } },
+      { $sort: { total_spent: -1 } }
+    ]);
+
+    const result = customers.map(c => {
+      const { _id, __v, ...rest } = c;
+      return { id: _id.toString(), ...rest };
+    });
+
+    const summary = {
+      totalCustomers: result.length,
+      totalRevenue: result.reduce((sum, c) => sum + (c.total_spent || 0), 0)
+    };
+
+    res.json({ customers: result, summary });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getSupplierReport = async (req, res) => {
+  try {
+    const suppliers = await Supplier.aggregate([
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'supplier',
+          as: 'products'
+        }
+      },
+      {
+        $lookup: {
+          from: 'purchases',
+          localField: '_id',
+          foreignField: 'supplier',
+          as: 'purchases'
+        }
+      },
+      {
+        $addFields: {
+          product_count: { $size: '$products' },
+          purchase_count: { $size: '$purchases' },
+          total_purchased: { $sum: '$purchases.total_amount' }
+        }
+      },
+      { $project: { products: 0, purchases: 0 } },
+      { $sort: { total_purchased: -1 } }
+    ]);
+
+    const result = suppliers.map(s => {
+      const { _id, __v, ...rest } = s;
+      return { id: _id.toString(), ...rest };
+    });
+
+    const summary = {
+      totalSuppliers: result.length,
+      totalPurchased: result.reduce((sum, s) => sum + (s.total_purchased || 0), 0)
+    };
+
+    res.json({ suppliers: result, summary });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getPurchaseReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    const filter = {};
+    if (startDate && endDate) {
+      filter.created_at = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    const purchases = await Purchase.find(filter).populate('supplier', 'company_name').sort({ created_at: -1 });
+    const result = purchases.map(p => ({
+      ...p.toJSON(),
+      supplier_name: p.supplier?.company_name || null
+    }));
+
+    const summary = await Purchase.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total_orders: { $sum: 1 }, total_amount: { $sum: '$total_amount' } } }
+    ]);
+
+    res.json({
+      purchases: result,
+      summary: summary[0] || { total_orders: 0, total_amount: 0 },
       period: { startDate: startDate || 'all', endDate: endDate || today }
     });
   } catch (error) {
@@ -259,31 +206,68 @@ const getAccountsReport = (req, res) => {
   }
 };
 
-const getHistory = (req, res) => {
+const getAccountsReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    const filter = {};
+    if (startDate && endDate) {
+      filter.created_at = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    } else if (startDate) {
+      filter.created_at = { $gte: new Date(startDate) };
+    } else if (endDate) {
+      filter.created_at = { $lte: new Date(endDate) };
+    }
+
+    const transactions = await Transaction.find(filter).sort({ created_at: -1 });
+
+    const enriched = await Promise.all(transactions.map(async (t) => {
+      let account_name = 'Account';
+      if (t.account_type === 'cash') {
+        const ca = await CashAccount.findById(t.account_id);
+        if (ca) account_name = ca.name;
+      } else if (t.account_type === 'bank') {
+        const ba = await BankAccount.findById(t.account_id);
+        if (ba) account_name = ba.name;
+      }
+      return { ...t.toJSON(), account_name };
+    }));
+
+    const summary = await Transaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          total_transactions: { $sum: 1 },
+          total_credit: { $sum: { $cond: [{ $eq: ['$type', 'credit'] }, '$amount', 0] } },
+          total_debit: { $sum: { $cond: [{ $eq: ['$type', 'debit'] }, '$amount', 0] } },
+          total_transfer: { $sum: { $cond: [{ $eq: ['$type', 'transfer'] }, '$amount', 0] } },
+          total_profit: { $sum: { $cond: [{ $ifNull: ['$profit', false] }, '$profit', 0] } }
+        }
+      }
+    ]);
+
+    res.json({
+      transactions: enriched,
+      summary: summary[0] || { total_transactions: 0, total_credit: 0, total_debit: 0, total_transfer: 0, total_profit: 0 },
+      period: { startDate: startDate || 'all', endDate: endDate || today }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getHistory = async (req, res) => {
   try {
     const { limit = 100, offset = 0 } = req.query;
-    
-    const history = db.all(`
-      SELECT * FROM history
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `, [parseInt(limit), parseInt(offset)]);
-
-    const total = db.get('SELECT COUNT(*) as count FROM history');
-
-    res.json({ history, total: total?.count || 0 });
+    const [history, total] = await Promise.all([
+      History.find({}).sort({ created_at: -1 }).skip(parseInt(offset)).limit(parseInt(limit)),
+      History.countDocuments({})
+    ]);
+    res.json({ history: history.map(h => h.toJSON()), total });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-module.exports = {
-  getSalesReport,
-  getProfitLossReport,
-  getInventoryReport,
-  getCustomerReport,
-  getSupplierReport,
-  getPurchaseReport,
-  getAccountsReport,
-  getHistory
-};
+module.exports = { getSalesReport, getProfitLossReport, getInventoryReport, getCustomerReport, getSupplierReport, getPurchaseReport, getAccountsReport, getHistory };

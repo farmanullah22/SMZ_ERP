@@ -1,6 +1,37 @@
 const Customers = {
   async init() { await this.loadPage(); },
 
+  getFilterParams() {
+    const s = document.getElementById('custStartDate')?.value || '';
+    const e = document.getElementById('custEndDate')?.value || '';
+    const search = document.getElementById('customerSearch')?.value || '';
+    const params = {};
+    if (s) params.startDate = s;
+    if (e) params.endDate = e;
+    if (search) params.search = search;
+    return params;
+  },
+
+  async applyFilter() {
+    const customers = await API.customers.getAll(this.getFilterParams());
+    document.getElementById('customersList').innerHTML = this.renderTable(customers);
+    this.bindTableEvents(customers);
+    Toast.success('Filter applied');
+  },
+
+  async clearFilter() {
+    const sd = document.getElementById('custStartDate');
+    const ed = document.getElementById('custEndDate');
+    const sb = document.getElementById('customerSearch');
+    if (sd) sd.value = '';
+    if (ed) ed.value = '';
+    if (sb) sb.value = '';
+    const customers = await API.customers.getAll({});
+    document.getElementById('customersList').innerHTML = this.renderTable(customers);
+    this.bindTableEvents(customers);
+    Toast.success('Filter cleared');
+  },
+
   async loadPage() {
     const customers = await API.customers.getAll({});
     const container = document.getElementById('customersPage');
@@ -19,7 +50,21 @@ const Customers = {
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="customerSearch" placeholder="Search customers...">
+        <div class="filter-group">
+          <label>From</label>
+          <input type="date" id="custStartDate">
+        </div>
+        <div class="filter-group">
+          <label>To</label>
+          <input type="date" id="custEndDate">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="Customers.applyFilter()">
+          <i class="fas fa-filter"></i> Apply
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="Customers.clearFilter()">
+          <i class="fas fa-times"></i> Clear
+        </button>
+        <input type="text" id="customerSearch" placeholder="Search customers..." style="min-width:200px;">
       </div>
 
       <div id="customersList">
@@ -28,10 +73,15 @@ const Customers = {
 
     this.bindTableEvents(customers);
 
-    document.getElementById('customerSearch')?.addEventListener('input', async (e) => {
-      const customers = await API.customers.getAll({ search: e.target.value });
-      document.getElementById('customersList').innerHTML = this.renderTable(customers);
-      this.bindTableEvents(customers);
+    document.getElementById('customerSearch')?.addEventListener('input', (e) => {
+      this.searchTimeout && clearTimeout(this.searchTimeout);
+      this.searchTimeout = setTimeout(async () => {
+        const params = this.getFilterParams();
+        params.search = e.target.value;
+        const customers = await API.customers.getAll(params);
+        document.getElementById('customersList').innerHTML = this.renderTable(customers);
+        this.bindTableEvents(customers);
+      }, 300);
     });
   },
 
@@ -94,7 +144,7 @@ const Customers = {
         <div class="input-group"><label>Notes</label><textarea name="notes" rows="2">${customer.notes || ''}</textarea></div>
       </form>`, {
       title: 'Edit Customer',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Customers.saveCustomer(${customer.id})"><i class="fas fa-save"></i> Update</button>`
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Customers.saveCustomer('${customer.id}')"><i class="fas fa-save"></i> Update</button>`
     });
   },
 

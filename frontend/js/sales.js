@@ -111,7 +111,7 @@ const Sales = {
               ${products.length === 0 ? 
                 '<p class="text-muted text-center">No products available. Add products first.</p>' :
                 products.map(p => `
-                  <div class="pos-product-card" onclick="Sales.addToCart(${p.id})" data-id="${p.id}" data-name="${p.name}" data-price="${p.sale_price}" data-stock="${p.quantity}">
+                  <div class="pos-product-card" onclick="Sales.addToCart('${p.id}')" data-id="${p.id}" data-name="${p.name}" data-price="${p.sale_price}" data-stock="${p.quantity}">
                     <div class="product-name">${p.name}</div>
                     <div class="product-price">${Components.formatCurrency(p.sale_price)}</div>
                     <div class="product-stock ${p.quantity <= (p.reorder_level || 10) ? 'text-danger' : ''}">Stock: ${p.quantity}</div>
@@ -246,12 +246,12 @@ const Sales = {
           <div class="pos-cart-item-price">${Components.formatCurrency(item.sale_price)}</div>
         </div>
         <div class="pos-cart-item-qty">
-          <button onclick="Sales.updateQuantity(${item.product_id}, -1)"><i class="fas fa-minus"></i></button>
+          <button onclick="Sales.updateQuantity('${item.product_id}', -1)"><i class="fas fa-minus"></i></button>
           <span>${item.quantity}</span>
-          <button onclick="Sales.updateQuantity(${item.product_id}, 1)"><i class="fas fa-plus"></i></button>
+          <button onclick="Sales.updateQuantity('${item.product_id}', 1)"><i class="fas fa-plus"></i></button>
         </div>
         <div class="pos-cart-item-total">${Components.formatCurrency(item.subtotal)}</div>
-        <button class="pos-cart-item-remove" onclick="Sales.removeFromCart(${item.product_id})"><i class="fas fa-trash"></i></button>
+        <button class="pos-cart-item-remove" onclick="Sales.removeFromCart('${item.product_id}')"><i class="fas fa-trash"></i></button>
       </div>`).join('');
 
     const total = this.cart.reduce((s, i) => s + i.subtotal, 0);
@@ -280,7 +280,7 @@ const Sales = {
     try {
       Modal.loading(true);
       const sale = await API.sales.create({
-        customer_id: customerId ? parseInt(customerId) : null,
+        customer_id: customerId || null,
         items: items
       });
       Modal.loading(false);

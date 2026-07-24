@@ -1,4 +1,5 @@
-const db = require('../database/db');
+const mongoose = require('mongoose');
+const { Purchase, PurchaseItem, Product, CashAccount, Transaction, addHistory } = require('../database/db');
 
 const generateReferenceNumber = () => {
   const date = new Date();
@@ -7,204 +8,195 @@ const generateReferenceNumber = () => {
   return `${prefix}-${random}`;
 };
 
-const getAllPurchases = (req, res) => {
+const getAllPurchases = async (req, res) => {
   try {
     const { startDate, endDate, supplier, search } = req.query;
-    let query = `
-      SELECT p.*, s.company_name as supplier_name,
-        (SELECT COUNT(*) FROM purchase_items pi WHERE pi.purchase_id = p.id) as items_count
-      FROM purchases p
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE 1=1
-    `;
-    const params = [];
-
-    if (startDate) {
-      query += ' AND DATE(p.created_at) >= DATE(?)';
-      params.push(startDate);
-    }
-
-    if (endDate) {
-      query += ' AND DATE(p.created_at) <= DATE(?)';
-      params.push(endDate);
-    }
-
-    if (supplier && supplier !== 'all') {
-      query += ' AND p.supplier_id = ?';
-      params.push(parseInt(supplier));
-    }
-
+    const match = {};
+    if (startDate) match.created_at = { ...match.created_at, $gte: new Date(startDate) };
+    if (endDate) match.created_at = { ...match.created_at, $lte: new Date(endDate) };
+    if (supplier && supplier !== 'all') match.supplier = new mongoose.Types.ObjectId(supplier);
     if (search) {
-      query += ' AND (p.reference_number LIKE ? OR s.company_name LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      match.$or = [
+        { reference_number: { $regex: search, $options: 'i' } },
+        { 'supplier.company_name': { $regex: search, $options: 'i' } }
+      ];
     }
-
-    query += ' ORDER BY p.created_at DESC';
-
-    const purchases = db.all(query, params);
-    res.json(purchases);
+    const purchases = await Purchase.aggregate([
+      {
+        $lookup: {
+          from: 'suppliers',
+          localField: 'supplier',
+          foreignField: '_id',
+          as: 'supplier'
+        }
+      },
+      { $unwind: { path: '$supplier', preserveNullAndEmptyArrays: true } },
+      { $match: match },
+      {
+        $lookup: {
+          from: 'purchaseitems',
+          localField: '_id',
+          foreignField: 'purchase',
+          as: 'items'
+        }
+      },
+      {
+        $addFields: {
+          items_count: { $size: '$items' },
+          supplier_name: '$supplier.company_name'
+        }
+      },
+      { $project: { items: 0, supplier: 0, __v: 0 } },
+      { $sort: { created_at: -1 } }
+    ]);
+    const result = purchases.map(p => {
+      const { _id, ...rest } = p;
+      return { id: _id.toString(), ...rest };
+    });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getPurchase = (req, res) => {
+const getPurchase = async (req, res) => {
   try {
-    const purchase = db.get(`
-      SELECT p.*, s.company_name as supplier_name, s.contact_person, s.phone
-      FROM purchases p
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE p.id = ?
-    `, [parseInt(req.params.id)]);
-    
-    if (!purchase) {
-      return res.status(404).json({ error: 'Purchase not found' });
-    }
-
-    const items = db.all('SELECT * FROM purchase_items WHERE purchase_id = ?', [parseInt(req.params.id)]);
-    res.json({ ...purchase, items });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const createPurchase = (req, res) => {
-  try {
-    const { supplier_id, items, notes, payment_method = 'cash' } = req.body;
-
-    if (!supplier_id) {
-      return res.status(400).json({ error: 'Supplier is required' });
-    }
-
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'No items in purchase' });
-    }
-
-    const referenceNumber = generateReferenceNumber();
-    let totalAmount = 0;
-    const processedItems = [];
-
-    for (const item of items) {
-      const product = db.get('SELECT * FROM products WHERE id = ?', [item.product_id]);
-      
-      let productName = item.product_name || 'Unknown';
-      let costPrice = item.cost_price;
-
-      if (product) {
-        productName = product.name;
-        db.run('UPDATE products SET quantity = quantity + ?, cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-          [item.quantity, item.cost_price, item.product_id]);
-      }
-
-      const subtotal = item.quantity * item.cost_price;
-      totalAmount += subtotal;
-
-      processedItems.push({
-        product_id: item.product_id || null,
-        product_name: productName,
-        quantity: item.quantity,
-        cost_price: costPrice,
-        subtotal
-      });
-    }
-
-    const purchaseResult = db.run(`
-      INSERT INTO purchases (reference_number, supplier_id, total_amount, notes)
-      VALUES (?, ?, ?, ?)
-    `, [referenceNumber, supplier_id, totalAmount, notes]);
-
-    const purchaseId = purchaseResult.lastInsertRowid;
-
-    for (const item of processedItems) {
-      db.run(`
-        INSERT INTO purchase_items (purchase_id, product_id, product_name, quantity, cost_price, subtotal)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [
-        purchaseId, item.product_id, item.product_name, item.quantity, item.cost_price, item.subtotal
-      ]);
-    }
-
-    if (payment_method === 'cash') {
-      db.run('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE id = 1', [totalAmount]);
-      
-      db.run(`
-        INSERT INTO transactions (type, category, account_type, account_id, amount, description, reference_id, reference_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, ['debit', 'purchase', 'cash', 1, totalAmount, `Purchase: ${referenceNumber}`, purchaseId, 'purchase']);
-    }
-
-    addHistory('CREATE', 'purchase', purchaseId, `Created purchase: ${referenceNumber} - PKR ${totalAmount.toLocaleString()}`);
-
-    const purchase = db.get('SELECT * FROM purchases WHERE id = ?', [purchaseId]);
-    const purchaseItems = db.all('SELECT * FROM purchase_items WHERE purchase_id = ?', [purchaseId]);
-
-    res.status(201).json({ ...purchase, items: purchaseItems });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const deletePurchase = (req, res) => {
-  try {
-    const { id } = req.params;
-    const purchase = db.get('SELECT * FROM purchases WHERE id = ?', [parseInt(id)]);
-
-    if (!purchase) {
-      return res.status(404).json({ error: 'Purchase not found' });
-    }
-
-    const items = db.all('SELECT * FROM purchase_items WHERE purchase_id = ?', [parseInt(id)]);
-
-    for (const item of items) {
-      if (item.product_id) {
-        db.run('UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-          [item.quantity, item.product_id]);
-      }
-    }
-
-    db.run('UPDATE cash_accounts SET current_balance = current_balance + ? WHERE id = 1', [purchase.total_amount]);
-    db.run('DELETE FROM transactions WHERE reference_id = ? AND reference_type = ?', [parseInt(id), 'purchase']);
-    db.run('DELETE FROM purchase_items WHERE purchase_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM purchases WHERE id = ?', [parseInt(id)]);
-
-    addHistory('DELETE', 'purchase', parseInt(id), `Deleted purchase: ${purchase.reference_number}`);
-
-    res.json({ message: 'Purchase deleted and stock adjusted' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const getPurchaseStats = (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-
-    const totalPurchases = db.get('SELECT SUM(total_amount) as total FROM purchases') || { total: 0 };
-    const todayPurchases = db.get('SELECT SUM(total_amount) as total FROM purchases WHERE DATE(created_at) = DATE(?)', [today]) || { total: 0 };
-    const monthPurchases = db.get('SELECT SUM(total_amount) as total FROM purchases WHERE DATE(created_at) >= ?', [startOfMonth]) || { total: 0 };
-
+    const purchase = await Purchase.findById(req.params.id).populate('supplier', 'company_name contact_person phone');
+    if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+    const items = await PurchaseItem.find({ purchase: purchase._id });
     res.json({
-      totalPurchases: totalPurchases.total || 0,
-      todayPurchases: todayPurchases.total || 0,
-      monthPurchases: monthPurchases.total || 0
+      ...purchase.toJSON(),
+      supplier_name: purchase.supplier?.company_name || null,
+      contact_person: purchase.supplier?.contact_person || null,
+      phone: purchase.supplier?.phone || null,
+      items
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-function addHistory(actionType, entityType, entityId, description) {
-  db.run(`
-    INSERT INTO history (action_type, entity_type, entity_id, description)
-    VALUES (?, ?, ?, ?)
-  `, [actionType, entityType, entityId, description]);
-}
+const createPurchase = async (req, res) => {
+  try {
+    const { supplier_id, items, notes, payment_method = 'cash' } = req.body;
+    if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
+    if (!items || items.length === 0) return res.status(400).json({ error: 'No items in purchase' });
 
-module.exports = {
-  getAllPurchases,
-  getPurchase,
-  createPurchase,
-  deletePurchase,
-  getPurchaseStats
+    const referenceNumber = generateReferenceNumber();
+    let totalAmount = 0;
+    const processedItems = [];
+
+    for (const item of items) {
+      const product = await Product.findById(item.product_id);
+      let productName = item.product_name || 'Unknown';
+
+      if (product) {
+        productName = product.name;
+        product.quantity += item.quantity;
+        product.cost_price = item.cost_price;
+        await product.save();
+      }
+
+      const subtotal = item.quantity * item.cost_price;
+      totalAmount += subtotal;
+
+      processedItems.push({
+        product: item.product_id || null,
+        product_name: productName,
+        quantity: item.quantity,
+        cost_price: item.cost_price,
+        subtotal
+      });
+    }
+
+    const purchase = await Purchase.create({
+      reference_number: referenceNumber,
+      supplier: supplier_id,
+      total_amount: totalAmount,
+      notes
+    });
+
+    const purchaseId = purchase._id;
+    for (const item of processedItems) {
+      await PurchaseItem.create({ purchase: purchaseId, ...item });
+    }
+
+    if (payment_method === 'cash') {
+      const cashAccount = await CashAccount.findOne({});
+      if (cashAccount) {
+        await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: -totalAmount } });
+        await Transaction.create({
+          type: 'debit', category: 'purchase', account_type: 'cash',
+          account_id: cashAccount._id, amount: totalAmount,
+          description: `Purchase: ${referenceNumber}`,
+          reference_id: purchaseId, reference_type: 'purchase'
+        });
+      }
+    }
+
+    addHistory('CREATE', 'purchase', purchaseId, `Created purchase: ${referenceNumber} - PKR ${totalAmount.toLocaleString()}`);
+
+    const purchaseItems = await PurchaseItem.find({ purchase: purchaseId });
+    res.status(201).json({ ...purchase.toJSON(), items: purchaseItems });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
+
+const deletePurchase = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const purchase = await Purchase.findById(id);
+    if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+
+    const items = await PurchaseItem.find({ purchase: purchase._id });
+
+    for (const item of items) {
+      if (item.product) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { quantity: -item.quantity } });
+      }
+    }
+
+    const cashAccount = await CashAccount.findOne({});
+    if (cashAccount) {
+      await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: purchase.total_amount } });
+    }
+
+    await Transaction.deleteMany({ reference_id: purchase._id, reference_type: 'purchase' });
+    await PurchaseItem.deleteMany({ purchase: purchase._id });
+    await Purchase.findByIdAndDelete(id);
+
+    addHistory('DELETE', 'purchase', id, `Deleted purchase: ${purchase.reference_number}`);
+    res.json({ message: 'Purchase deleted and stock adjusted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getPurchaseStats = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const total = await Purchase.aggregate([{ $group: { _id: null, total: { $sum: '$total_amount' } } }]);
+    const todayTotal = await Purchase.aggregate([
+      { $match: { created_at: { $gte: today } } },
+      { $group: { _id: null, total: { $sum: '$total_amount' } } }
+    ]);
+    const monthTotal = await Purchase.aggregate([
+      { $match: { created_at: { $gte: startOfMonth } } },
+      { $group: { _id: null, total: { $sum: '$total_amount' } } }
+    ]);
+
+    res.json({
+      totalPurchases: total[0]?.total || 0,
+      todayPurchases: todayTotal[0]?.total || 0,
+      monthPurchases: monthTotal[0]?.total || 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { getAllPurchases, getPurchase, createPurchase, deletePurchase, getPurchaseStats };

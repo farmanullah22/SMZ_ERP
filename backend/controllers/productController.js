@@ -1,340 +1,242 @@
-const db = require('../database/db');
+const { Product, Category, Supplier, addHistory } = require('../database/db');
 
-const getAllProducts = (req, res) => {
+const getAllProducts = async (req, res) => {
   try {
-    const { search, category, supplier, lowStock, sort } = req.query;
-    let query = `
-      SELECT p.*, 
-             c.name as category_name,
-             s.company_name as supplier_name,
-             CASE WHEN p.quantity <= p.reorder_level THEN 'low' ELSE 'ok' END as stock_status
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE 1=1
-    `;
-    const params = [];
-
+    const { search, category, supplier, lowStock, sort, startDate, endDate } = req.query;
+    const filter = {};
+    if (startDate) filter.created_at = { ...filter.created_at, $gte: new Date(startDate) };
+    if (endDate) filter.created_at = { ...filter.created_at, $lte: new Date(endDate) };
     if (search) {
-      query += ' AND (p.name LIKE ? OR p.sku LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } }
+      ];
     }
-
-    if (category && category !== 'all') {
-      query += ' AND p.category_id = ?';
-      params.push(parseInt(category));
-    }
-
-    if (supplier && supplier !== 'all') {
-      query += ' AND p.supplier_id = ?';
-      params.push(parseInt(supplier));
-    }
-
-    if (lowStock === 'true') {
-      query += ' AND p.quantity <= p.reorder_level';
-    }
-
-    const sortOptions = {
-      name_asc: 'p.name ASC',
-      name_desc: 'p.name DESC',
-      price_asc: 'p.sale_price ASC',
-      price_desc: 'p.sale_price DESC',
-      quantity_asc: 'p.quantity ASC',
-      quantity_desc: 'p.quantity DESC',
-      newest: 'p.created_at DESC'
+    if (category && category !== 'all') filter.category = category;
+    if (supplier && supplier !== 'all') filter.supplier = supplier;
+    if (lowStock === 'true') filter.$expr = { $lte: ['$quantity', '$reorder_level'] };
+    const sortMap = {
+      name_asc: 'name', name_desc: '-name',
+      price_asc: 'sale_price', price_desc: '-sale_price',
+      quantity_asc: 'quantity', quantity_desc: '-quantity',
+      newest: '-created_at'
     };
-    query += ` ORDER BY ${sortOptions[sort] || 'p.name ASC'}`;
-
-    const products = db.all(query, params);
-    res.json(products);
+    const products = await Product.find(filter)
+      .populate('category', 'name')
+      .populate('supplier', 'company_name')
+      .sort(sortMap[sort] || 'name');
+    const result = products.map(p => ({
+      ...p.toJSON(),
+      category_name: p.category?.name || null,
+      supplier_name: p.supplier?.company_name || null,
+      stock_status: p.quantity <= p.reorder_level ? 'low' : 'ok'
+    }));
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getProduct = (req, res) => {
+const getProduct = async (req, res) => {
   try {
-    const product = db.get(`
-      SELECT p.*, 
-             c.name as category_name,
-             s.company_name as supplier_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE p.id = ?
-    `, [parseInt(req.params.id)]);
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    res.json(product);
+    const product = await Product.findById(req.params.id)
+      .populate('category', 'name')
+      .populate('supplier', 'company_name');
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    res.json({
+      ...product.toJSON(),
+      category_name: product.category?.name || null,
+      supplier_name: product.supplier?.company_name || null
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const createProduct = (req, res) => {
+const createProduct = async (req, res) => {
   try {
     const { sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description } = req.body;
-    
     if (!name || cost_price === undefined || sale_price === undefined) {
       return res.status(400).json({ error: 'Name, cost price, and sale price are required' });
     }
-
-    const result = db.run(`
-      INSERT INTO products (sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      sku || `SKU-${Date.now()}`,
+    const product = await Product.create({
+      sku: sku || `SKU-${Date.now()}`,
       name,
-      category_id || null,
-      supplier_id || null,
+      category: category_id || null,
+      supplier: supplier_id || null,
       cost_price,
       sale_price,
-      quantity || 0,
-      reorder_level || 10,
-      description || null
-    ]);
-
-    const productId = result.lastInsertRowid;
-    const product = db.get('SELECT * FROM products WHERE id = ?', [productId]);
-    
-    if (!product) {
-      return res.status(500).json({ error: 'Failed to retrieve created product', id: productId });
-    }
-    
-    addHistory('CREATE', 'product', productId, `Created product: ${name}`);
-    
-    res.status(201).json(product);
+      quantity: quantity || 0,
+      reorder_level: reorder_level || 10,
+      description: description || null
+    });
+    addHistory('CREATE', 'product', product.id, `Created product: ${name}`);
+    res.status(201).json(product.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const updateProduct = (req, res) => {
+const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const oldProduct = db.get('SELECT * FROM products WHERE id = ?', [parseInt(id)]);
-    
-    if (!oldProduct) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
+    const oldProduct = await Product.findById(id);
+    if (!oldProduct) return res.status(404).json({ error: 'Product not found' });
     const { sku, name, category_id, supplier_id, cost_price, sale_price, quantity, reorder_level, description } = req.body;
-    
-    db.run(`
-      UPDATE products 
-      SET sku = COALESCE(?, sku),
-          name = COALESCE(?, name),
-          category_id = ?,
-          supplier_id = ?,
-          cost_price = COALESCE(?, cost_price),
-          sale_price = COALESCE(?, sale_price),
-          quantity = COALESCE(?, quantity),
-          reorder_level = COALESCE(?, reorder_level),
-          description = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [
-      sku,
-      name,
-      category_id,
-      supplier_id,
-      cost_price,
-      sale_price,
-      quantity,
-      reorder_level,
-      description,
-      parseInt(id)
-    ]);
-
-    const updatedProduct = db.get('SELECT * FROM products WHERE id = ?', [parseInt(id)]);
-    addHistory('UPDATE', 'product', parseInt(id), `Updated product: ${updatedProduct.name}`);
-    
-    res.json(updatedProduct);
+    const update = {};
+    if (sku !== undefined) update.sku = sku;
+    if (name !== undefined) update.name = name;
+    if (category_id !== undefined) update.category = category_id || null;
+    if (supplier_id !== undefined) update.supplier = supplier_id || null;
+    if (cost_price !== undefined) update.cost_price = cost_price;
+    if (sale_price !== undefined) update.sale_price = sale_price;
+    if (quantity !== undefined) update.quantity = quantity;
+    if (reorder_level !== undefined) update.reorder_level = reorder_level;
+    if (description !== undefined) update.description = description || null;
+    await Product.findByIdAndUpdate(id, update);
+    const updated = await Product.findById(id);
+    addHistory('UPDATE', 'product', id, `Updated product: ${updated.name}`);
+    res.json(updated.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const deleteProduct = (req, res) => {
+const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const product = db.get('SELECT * FROM products WHERE id = ?', [parseInt(id)]);
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    db.run('DELETE FROM products WHERE id = ?', [parseInt(id)]);
-    addHistory('DELETE', 'product', parseInt(id), `Deleted product: ${product.name}`);
-    
+    const product = await Product.findById(id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    await Product.findByIdAndDelete(id);
+    addHistory('DELETE', 'product', id, `Deleted product: ${product.name}`);
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getCategories = (req, res) => {
+const getCategories = async (req, res) => {
   try {
-    const categories = db.all('SELECT * FROM categories ORDER BY name');
-    res.json(categories);
+    const categories = await Category.find({}).sort('name');
+    res.json(categories.map(c => c.toJSON()));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const createCategory = (req, res) => {
+const createCategory = async (req, res) => {
   try {
     const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ error: 'Category name is required' });
-    }
-
-    const result = db.run('INSERT INTO categories (name) VALUES (?)', [name]);
-    res.status(201).json({ id: result.lastInsertRowid, name });
+    if (!name) return res.status(400).json({ error: 'Category name is required' });
+    const category = await Category.create({ name });
+    res.status(201).json(category.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const deleteCategory = (req, res) => {
+const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const category = db.get('SELECT * FROM categories WHERE id = ?', [parseInt(id)]);
-    
-    if (!category) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-
-    db.run('UPDATE products SET category_id = NULL WHERE category_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM categories WHERE id = ?', [parseInt(id)]);
-    
+    const category = await Category.findById(id);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+    await Product.updateMany({ category: id }, { $set: { category: null } });
+    await Category.findByIdAndDelete(id);
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getSuppliers = (req, res) => {
+const getSuppliers = async (req, res) => {
   try {
-    const suppliers = db.all(`
-      SELECT s.*, 
-             COUNT(p.id) as product_count
-      FROM suppliers s
-      LEFT JOIN products p ON s.id = p.supplier_id
-      GROUP BY s.id
-      ORDER BY s.company_name
-    `);
-    res.json(suppliers);
+    const { startDate, endDate } = req.query;
+    const match = {};
+    if (startDate) match.created_at = { ...match.created_at, $gte: new Date(startDate) };
+    if (endDate) match.created_at = { ...match.created_at, $lte: new Date(endDate) };
+    const pipeline = [];
+    if (startDate || endDate) pipeline.push({ $match: match });
+    pipeline.push(
+      { $lookup: { from: 'products', localField: '_id', foreignField: 'supplier', as: 'products' } },
+      { $addFields: { product_count: { $size: '$products' } } },
+      { $project: { products: 0 } },
+      { $sort: { company_name: 1 } }
+    );
+    const suppliers = await Supplier.aggregate(pipeline);
+    const result = suppliers.map(s => {
+      const { _id, __v, products, ...rest } = s;
+      return { id: _id.toString(), ...rest };
+    });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const createSupplier = (req, res) => {
+const createSupplier = async (req, res) => {
   try {
     const { company_name, contact_person, email, phone, address, notes } = req.body;
-    
-    if (!company_name) {
-      return res.status(400).json({ error: 'Company name is required' });
-    }
-
-    const result = db.run(`
-      INSERT INTO suppliers (company_name, contact_person, email, phone, address, notes)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [company_name, contact_person, email, phone, address, notes]);
-    
-    addHistory('CREATE', 'supplier', result.lastInsertRowid, `Created supplier: ${company_name}`);
-    
-    res.status(201).json({ id: result.lastInsertRowid, company_name, contact_person, email, phone, address, notes });
+    if (!company_name) return res.status(400).json({ error: 'Company name is required' });
+    const supplier = await Supplier.create({ company_name, contact_person, email, phone, address, notes });
+    addHistory('CREATE', 'supplier', supplier.id, `Created supplier: ${company_name}`);
+    res.status(201).json(supplier.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const updateSupplier = (req, res) => {
+const updateSupplier = async (req, res) => {
   try {
     const { id } = req.params;
-    const supplier = db.get('SELECT * FROM suppliers WHERE id = ?', [parseInt(id)]);
-    
-    if (!supplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
-    }
-
+    const supplier = await Supplier.findById(id);
+    if (!supplier) return res.status(404).json({ error: 'Supplier not found' });
     const { company_name, contact_person, email, phone, address, notes } = req.body;
-    
-    db.run(`
-      UPDATE suppliers 
-      SET company_name = COALESCE(?, company_name),
-          contact_person = ?,
-          email = ?,
-          phone = ?,
-          address = ?,
-          notes = ?
-      WHERE id = ?
-    `, [company_name, contact_person, email, phone, address, notes, parseInt(id)]);
-
-    addHistory('UPDATE', 'supplier', parseInt(id), `Updated supplier: ${company_name || supplier.company_name}`);
-    
-    res.json(db.get('SELECT * FROM suppliers WHERE id = ?', [parseInt(id)]));
+    const update = {};
+    if (company_name !== undefined) update.company_name = company_name;
+    if (contact_person !== undefined) update.contact_person = contact_person;
+    if (email !== undefined) update.email = email;
+    if (phone !== undefined) update.phone = phone;
+    if (address !== undefined) update.address = address;
+    if (notes !== undefined) update.notes = notes;
+    await Supplier.findByIdAndUpdate(id, update);
+    const updated = await Supplier.findById(id);
+    addHistory('UPDATE', 'supplier', id, `Updated supplier: ${company_name || supplier.company_name}`);
+    res.json(updated.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const deleteSupplier = (req, res) => {
+const deleteSupplier = async (req, res) => {
   try {
     const { id } = req.params;
-    const supplier = db.get('SELECT * FROM suppliers WHERE id = ?', [parseInt(id)]);
-    
-    if (!supplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
-    }
-
-    db.run('DELETE FROM suppliers WHERE id = ?', [parseInt(id)]);
-    addHistory('DELETE', 'supplier', parseInt(id), `Deleted supplier: ${supplier.company_name}`);
-    
+    const supplier = await Supplier.findById(id);
+    if (!supplier) return res.status(404).json({ error: 'Supplier not found' });
+    await Supplier.findByIdAndDelete(id);
+    addHistory('DELETE', 'supplier', id, `Deleted supplier: ${supplier.company_name}`);
     res.json({ message: 'Supplier deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getLowStockProducts = (req, res) => {
+const getLowStockProducts = async (req, res) => {
   try {
-    const products = db.all(`
-      SELECT p.*, c.name as category_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.quantity <= p.reorder_level
-      ORDER BY p.quantity ASC
-    `);
-    res.json(products);
+    const products = await Product.find({ $expr: { $lte: ['$quantity', '$reorder_level'] } })
+      .populate('category', 'name')
+      .sort('quantity');
+    const result = products.map(p => ({
+      ...p.toJSON(),
+      category_name: p.category?.name || null
+    }));
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-function addHistory(actionType, entityType, entityId, description) {
-  db.run(`
-    INSERT INTO history (action_type, entity_type, entity_id, description)
-    VALUES (?, ?, ?, ?)
-  `, [actionType, entityType, entityId, description]);
-}
-
 module.exports = {
-  getAllProducts,
-  getProduct,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  getCategories,
-  createCategory,
-  deleteCategory,
-  getSuppliers,
-  createSupplier,
-  updateSupplier,
-  deleteSupplier,
-  getLowStockProducts
+  getAllProducts, getProduct, createProduct, updateProduct, deleteProduct,
+  getCategories, createCategory, deleteCategory,
+  getSuppliers, createSupplier, updateSupplier, deleteSupplier, getLowStockProducts
 };

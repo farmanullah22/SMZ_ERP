@@ -1,6 +1,35 @@
 const Suppliers = {
   async init() { await this.loadPage(); },
 
+  getFilterParams() {
+    const s = document.getElementById('suppStartDate')?.value || '';
+    const e = document.getElementById('suppEndDate')?.value || '';
+    const params = {};
+    if (s) params.startDate = s;
+    if (e) params.endDate = e;
+    return params;
+  },
+
+  async applyFilter() {
+    const suppliers = await API.products.getSuppliers(this.getFilterParams());
+    document.getElementById('suppliersList').innerHTML = this.renderTable(suppliers);
+    this.bindTableEvents(suppliers);
+    Toast.success('Filter applied');
+  },
+
+  async clearFilter() {
+    const sd = document.getElementById('suppStartDate');
+    const ed = document.getElementById('suppEndDate');
+    const sb = document.getElementById('supplierSearch');
+    if (sd) sd.value = '';
+    if (ed) ed.value = '';
+    if (sb) sb.value = '';
+    const suppliers = await API.products.getSuppliers({});
+    document.getElementById('suppliersList').innerHTML = this.renderTable(suppliers);
+    this.bindTableEvents(suppliers);
+    Toast.success('Filter cleared');
+  },
+
   async loadPage() {
     const suppliers = await API.products.getSuppliers();
     const container = document.getElementById('suppliersPage');
@@ -19,7 +48,21 @@ const Suppliers = {
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="supplierSearch" placeholder="Search suppliers...">
+        <div class="filter-group">
+          <label>From</label>
+          <input type="date" id="suppStartDate">
+        </div>
+        <div class="filter-group">
+          <label>To</label>
+          <input type="date" id="suppEndDate">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="Suppliers.applyFilter()">
+          <i class="fas fa-filter"></i> Apply
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="Suppliers.clearFilter()">
+          <i class="fas fa-times"></i> Clear
+        </button>
+        <input type="text" id="supplierSearch" placeholder="Search suppliers..." style="min-width:200px;">
       </div>
 
       <div id="suppliersList">
@@ -29,8 +72,9 @@ const Suppliers = {
     this.bindTableEvents(suppliers);
 
     document.getElementById('supplierSearch')?.addEventListener('input', async (e) => {
-      const suppliers = await API.products.getSuppliers();
-      const filtered = suppliers.filter(s => s.company_name.toLowerCase().includes(e.target.value.toLowerCase()));
+      const suppliers = await API.products.getSuppliers(this.getFilterParams());
+      const val = e.target.value.toLowerCase();
+      const filtered = val ? suppliers.filter(s => s.company_name.toLowerCase().includes(val)) : suppliers;
       document.getElementById('suppliersList').innerHTML = this.renderTable(filtered);
       this.bindTableEvents(filtered);
     });
@@ -94,7 +138,7 @@ const Suppliers = {
         <div class="input-group"><label>Notes</label><textarea name="notes" rows="2">${supplier.notes || ''}</textarea></div>
       </form>`, {
       title: 'Edit Supplier',
-      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Suppliers.saveSupplier(${supplier.id})"><i class="fas fa-save"></i> Update</button>`
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button><button class="btn btn-primary" onclick="Suppliers.saveSupplier('${supplier.id}')"><i class="fas fa-save"></i> Update</button>`
     });
   },
 

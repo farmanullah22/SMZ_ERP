@@ -241,7 +241,7 @@ const Purchases = {
       if (productId && qty > 0 && cost > 0) {
         valid = true;
         items.push({
-          product_id: parseInt(productId),
+          product_id: productId,
           quantity: qty,
           cost_price: cost
         });
@@ -258,7 +258,7 @@ const Purchases = {
     try {
       Modal.loading(true);
       await API.purchases.create({
-        supplier_id: parseInt(supplierId),
+        supplier_id: supplierId,
         items: items,
         notes: notes
       });

@@ -4,6 +4,8 @@ const Dashboard = {
   donutChart: null,
   pieChart: null,
   currentPeriod: 'monthly',
+  dateStart: '',
+  dateEnd: '',
 
   async init() {
     await this.loadStats();
@@ -13,10 +15,22 @@ const Dashboard = {
     setInterval(() => this.updateDateTime(), 1000);
   },
 
+  getDateParams() {
+    const s = document.getElementById('dashStartDate')?.value || '';
+    const e = document.getElementById('dashEndDate')?.value || '';
+    this.dateStart = s;
+    this.dateEnd = e;
+    const params = {};
+    if (s) params.startDate = s;
+    if (e) params.endDate = e;
+    return params;
+  },
+
   async loadStats() {
     try {
+      const dateParams = this.getDateParams();
       const [stats, accounts, stampPapers, expenses] = await Promise.all([
-        API.sales.getStats(),
+        API.sales.getStats(dateParams),
         API.accounts.getAll().catch(() => []),
         API.stampPapers.getAll().catch(() => []),
         API.expenses.getAll({}).catch(() => ({ expenses: [], summary: { total: 0 } }))
@@ -46,6 +60,23 @@ const Dashboard = {
               <i class="fas fa-sync-alt"></i> Refresh
             </button>
           </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label>From</label>
+            <input type="date" id="dashStartDate" value="${this.dateStart}">
+          </div>
+          <div class="filter-group">
+            <label>To</label>
+            <input type="date" id="dashEndDate" value="${this.dateEnd}">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="Dashboard.applyDateFilter()">
+            <i class="fas fa-filter"></i> Apply
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="Dashboard.clearDateFilter()">
+            <i class="fas fa-times"></i> Clear
+          </button>
         </div>
 
         <div class="stats-grid">
@@ -248,6 +279,22 @@ const Dashboard = {
     if (el) {
       el.textContent = new Date().toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
+  },
+
+  async applyDateFilter() {
+    Modal.loading(true);
+    await this.init();
+    Modal.loading(false);
+    Toast.success('Filter applied');
+  },
+
+  async clearDateFilter() {
+    this.dateStart = '';
+    this.dateEnd = '';
+    Modal.loading(true);
+    await this.init();
+    Modal.loading(false);
+    Toast.success('Filter cleared');
   },
 
   async refresh() {

@@ -1,161 +1,134 @@
-const db = require('../database/db');
+const { Expense, CashAccount, BankAccount, Transaction, addHistory } = require('../database/db');
 
-const getExpenses = (req, res) => {
+const getExpenses = async (req, res) => {
   try {
     const { startDate, endDate, category, search } = req.query;
-    let query = 'SELECT * FROM expenses WHERE 1=1';
-    const params = [];
+    const filter = {};
+    if (startDate) filter.expense_date = { ...filter.expense_date, $gte: new Date(startDate) };
+    if (endDate) filter.expense_date = { ...filter.expense_date, $lte: new Date(endDate) };
+    if (category && category !== 'all') filter.category = category;
+    if (search) filter.description = { $regex: search, $options: 'i' };
 
-    if (startDate) {
-      query += ' AND DATE(expense_date) >= DATE(?)';
-      params.push(startDate);
-    }
-    if (endDate) {
-      query += ' AND DATE(expense_date) <= DATE(?)';
-      params.push(endDate);
-    }
-    if (category && category !== 'all') {
-      query += ' AND category = ?';
-      params.push(category);
-    }
-    if (search) {
-      query += ' AND description LIKE ?';
-      params.push(`%${search}%`);
-    }
+    const expenses = await Expense.find(filter).sort({ expense_date: -1, created_at: -1 });
+    const totals = await Expense.aggregate([
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amount' } } }
+    ]);
 
-    query += ' ORDER BY expense_date DESC, created_at DESC';
-    const expenses = db.all(query, params);
-
-    const totals = db.get(`
-      SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total
-      FROM expenses WHERE 1=1
-    `);
-
-    res.json({ expenses, summary: { count: totals?.count || 0, total: totals?.total || 0 } });
+    res.json({
+      expenses: expenses.map(e => e.toJSON()),
+      summary: { count: totals[0]?.count || 0, total: totals[0]?.total || 0 }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const getCategories = (req, res) => {
+const getCategories = async (req, res) => {
   try {
-    const rows = db.all('SELECT DISTINCT category FROM expenses ORDER BY category');
-    res.json(rows.map(r => r.category));
+    const result = await Expense.distinct('category');
+    res.json(result.sort());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const createExpense = (req, res) => {
+const createExpense = async (req, res) => {
   try {
     const { category, amount, description, payment_method, expense_date } = req.body;
-
-    if (!amount || parseFloat(amount) <= 0) {
-      return res.status(400).json({ error: 'Valid amount is required' });
-    }
+    if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Valid amount is required' });
 
     const parsedAmount = parseFloat(amount);
     const cat = category || 'Other';
     const pm = payment_method || 'cash';
     const date = expense_date || new Date().toISOString().split('T')[0];
 
-    const result = db.run(`
-      INSERT INTO expenses (category, amount, description, payment_method, expense_date)
-      VALUES (?, ?, ?, ?, ?)
-    `, [cat, parsedAmount, description || null, pm, date]);
+    const expense = await Expense.create({
+      category: cat, amount: parsedAmount,
+      description: description || null,
+      payment_method: pm, expense_date: date
+    });
 
-    // Deduct from cash account if payment method is cash
     if (pm === 'cash') {
-      db.run('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE id = 1', [parsedAmount]);
-      db.run(`
-        INSERT INTO transactions (type, category, account_type, account_id, amount, description)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, ['debit', 'expense', 'cash', 1, parsedAmount, `Expense: ${description || cat}`]);
+      const cashAccount = await CashAccount.findOne({});
+      if (cashAccount) {
+        await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: -parsedAmount } });
+        await Transaction.create({
+          type: 'debit', category: 'expense', account_type: 'cash',
+          account_id: cashAccount._id, amount: parsedAmount,
+          description: `Expense: ${description || cat}`
+        });
+      }
     } else if (pm === 'bank') {
-      // If bank, deduct from first bank account (or we could add account_id later)
-      const bankAcc = db.get('SELECT id FROM bank_accounts ORDER BY id LIMIT 1');
+      const bankAcc = await BankAccount.findOne({}).sort({ _id: 1 });
       if (bankAcc) {
-        db.run('UPDATE bank_accounts SET balance = balance - ? WHERE id = ?', [parsedAmount, bankAcc.id]);
-        db.run(`
-          INSERT INTO transactions (type, category, account_type, account_id, amount, description)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, ['debit', 'expense', 'bank', bankAcc.id, parsedAmount, `Expense: ${description || cat}`]);
+        await BankAccount.findByIdAndUpdate(bankAcc._id, { $inc: { balance: -parsedAmount } });
+        await Transaction.create({
+          type: 'debit', category: 'expense', account_type: 'bank',
+          account_id: bankAcc._id, amount: parsedAmount,
+          description: `Expense: ${description || cat}`
+        });
       }
     }
 
-    addHistory('CREATE', 'expense', result.lastInsertRowid, `Expense: ${cat} - PKR ${parsedAmount.toLocaleString()}`);
-
-    const expense = db.get('SELECT * FROM expenses WHERE id = ?', [result.lastInsertRowid]);
-    res.status(201).json(expense);
+    addHistory('CREATE', 'expense', expense.id, `Expense: ${cat} - PKR ${parsedAmount.toLocaleString()}`);
+    res.status(201).json(expense.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const updateExpense = (req, res) => {
+const updateExpense = async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.get('SELECT * FROM expenses WHERE id = ?', [parseInt(id)]);
+    const existing = await Expense.findById(id);
     if (!existing) return res.status(404).json({ error: 'Expense not found' });
 
     const { category, amount, description, payment_method, expense_date } = req.body;
-
     const diff = amount !== undefined ? parseFloat(amount) - existing.amount : 0;
 
-    db.run(`
-      UPDATE expenses SET
-        category = COALESCE(?, category),
-        amount = COALESCE(?, amount),
-        description = ?,
-        payment_method = COALESCE(?, payment_method),
-        expense_date = COALESCE(?, expense_date)
-      WHERE id = ?
-    `, [
-      category || null,
-      amount !== undefined ? parseFloat(amount) : null,
-      description !== undefined ? description : null,
-      payment_method || null,
-      expense_date || null,
-      parseInt(id)
-    ]);
+    const update = {};
+    if (category !== undefined) update.category = category;
+    if (amount !== undefined) update.amount = parseFloat(amount);
+    if (description !== undefined) update.description = description;
+    if (payment_method !== undefined) update.payment_method = payment_method;
+    if (expense_date !== undefined) update.expense_date = expense_date;
 
-    // Adjust cash/bank if payment method was cash
+    await Expense.findByIdAndUpdate(id, update);
+
     if (diff !== 0 && existing.payment_method === 'cash') {
-      db.run('UPDATE cash_accounts SET current_balance = current_balance + ? WHERE id = 1', [diff]);
+      const cashAccount = await CashAccount.findOne({});
+      if (cashAccount) {
+        await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: diff } });
+      }
     }
 
-    addHistory('UPDATE', 'expense', parseInt(id), `Updated expense #${id}`);
-    res.json(db.get('SELECT * FROM expenses WHERE id = ?', [parseInt(id)]));
+    addHistory('UPDATE', 'expense', id, `Updated expense #${id}`);
+    const updated = await Expense.findById(id);
+    res.json(updated.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const deleteExpense = (req, res) => {
+const deleteExpense = async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.get('SELECT * FROM expenses WHERE id = ?', [parseInt(id)]);
+    const existing = await Expense.findById(id);
     if (!existing) return res.status(404).json({ error: 'Expense not found' });
 
-    // Restore cash if payment was cash
     if (existing.payment_method === 'cash') {
-      db.run('UPDATE cash_accounts SET current_balance = current_balance + ? WHERE id = 1', [existing.amount]);
+      const cashAccount = await CashAccount.findOne({});
+      if (cashAccount) {
+        await CashAccount.findByIdAndUpdate(cashAccount._id, { $inc: { current_balance: existing.amount } });
+      }
     }
 
-    db.run('DELETE FROM expenses WHERE id = ?', [parseInt(id)]);
-    addHistory('DELETE', 'expense', parseInt(id), `Deleted expense: ${existing.category} - PKR ${existing.amount.toLocaleString()}`);
-
+    await Expense.findByIdAndDelete(id);
+    addHistory('DELETE', 'expense', id, `Deleted expense: ${existing.category} - PKR ${existing.amount.toLocaleString()}`);
     res.json({ message: 'Expense deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
-function addHistory(actionType, entityType, entityId, description) {
-  try {
-    db.run('INSERT INTO history (action_type, entity_type, entity_id, description) VALUES (?, ?, ?, ?)',
-      [actionType, entityType, entityId, description]);
-  } catch (e) { console.error('History error:', e); }
-}
 
 module.exports = { getExpenses, getCategories, createExpense, updateExpense, deleteExpense };

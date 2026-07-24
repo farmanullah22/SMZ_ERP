@@ -1,21 +1,15 @@
+require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const { initDatabase } = require('./database/db');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
-
-const dataDir = process.env.SMZ_DATA_DIR || __dirname;
-const uploadsDir = path.join(dataDir, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
@@ -45,11 +39,10 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await initDatabase();
-    console.log('Database initialized successfully');
+    console.log('Database connected successfully');
     return await new Promise((resolve, reject) => {
       const server = app.listen(PORT, () => {
         console.log(`Server running at http://localhost:${PORT}`);
-        console.log(`Open http://localhost:${PORT} in your browser`);
         resolve(server);
       });
       server.on('error', reject);
