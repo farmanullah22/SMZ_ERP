@@ -145,6 +145,8 @@ const historySchema = new mongoose.Schema({
   user_id: String
 }, { timestamps: { createdAt: 'created_at' }, toJSON });
 
+const websiteContentSchema = new mongoose.Schema({}, { strict: false });
+
 const expenseSchema = new mongoose.Schema({
   category: { type: String, default: 'Other' },
   amount: { type: Number, required: true },
@@ -223,6 +225,7 @@ const Transaction = mongoose.model('Transaction', transactionSchema);
 const Setting = mongoose.model('Setting', settingSchema);
 const History = mongoose.model('History', historySchema);
 const Expense = mongoose.model('Expense', expenseSchema);
+const WebsiteContent = mongoose.model('WebsiteContent', websiteContentSchema);
 const Service = mongoose.model('Service', serviceSchema);
 const MobileTransaction = mongoose.model('MobileTransaction', mobileTransactionSchema);
 const Recharge = mongoose.model('Recharge', rechargeSchema);
@@ -286,6 +289,7 @@ module.exports = {
   Setting,
   History,
   Expense,
+  WebsiteContent,
   Service,
   MobileTransaction,
   Recharge,
