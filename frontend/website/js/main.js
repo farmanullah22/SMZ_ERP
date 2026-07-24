@@ -25,7 +25,7 @@ const Website = {
     const cn = c.contact || {};
     const st = c.site || {};
 
-    document.title = (st.site_name || 'SMZ ERP') + ' - Complete Business Management Software';
+    document.title = (st.site_name || 'SMZ ERP') + ' - Shop Management Software';
 
     const heroStats = (h.stats || []).map(s => `
       <div class="hero-stat">

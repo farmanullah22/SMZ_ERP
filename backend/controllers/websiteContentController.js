@@ -28,11 +28,11 @@ function getDefaultContent() {
   return {
     site: { site_name: 'SMZ ERP', logo: '' },
     hero: {
-      badge: 'Complete Business Solution',
-      heading: 'Manage Your PCO, Mobile Shop & Document Records in One Powerful Software',
-      subheading: 'Store customer records, stamp papers, birth certificates, EasyPaisa/JazzCash transactions, mobile load sales, inventory, accounts, and documents securely in one centralized system.',
-      description: 'Never lose customer data again. Search any record within seconds using a name, mobile number, CNIC, application number, or stamp paper number—even after many years.',
-      button1_text: 'Get Free Demo',
+      badge: 'All-in-One Shop Management',
+      heading: 'Manage Your Shop Records, Documents & Finances in One Place',
+      subheading: 'Keep customer records, stamp papers, birth certificates, EasyPaisa/JazzCash transactions, mobile load sales, inventory, and accounts organized — all from a single dashboard.',
+      description: 'Never lose track of customer data again. Search any record instantly by name, mobile number, CNIC, or stamp paper number — even years later.',
+      button1_text: 'Get Started',
       button1_link: '#contact',
       button2_text: 'Contact Us',
       button2_link: '#contact',
@@ -40,45 +40,45 @@ function getDefaultContent() {
       stats: [
         { number: '10+', label: 'Years Record Storage' },
         { number: 'Instant', label: 'Smart Search' },
-        { number: 'Secure', label: 'Cloud Backup' },
-        { number: 'Multi', label: 'User Access' }
+        { number: 'Secure', label: 'Data Backup' },
+        { number: '100%', label: 'Easy to Use' }
       ]
     },
     stampSearch: {
       heading: 'Find Any Stamp Paper Instantly',
-      description: 'Enter a Stamp Paper Number to quickly locate customer details, documents, issue date, purpose, and complete transaction history.',
+      description: 'Enter a Stamp Paper Number to quickly find customer details, documents, issue date, purpose, and complete transaction history.',
       placeholder: 'Enter Stamp Paper Number',
       button_text: 'Search Record',
       hint: 'Search records from years of stored data within seconds.'
     },
     about: {
-      tag: 'About Software',
-      heading: 'Complete Business Management Solution',
-      text: 'Our software is specially designed for PCOs, Mobile Shops, EasyPaisa/JazzCash Retailers, and Document Service Providers. It helps businesses manage customer records, documents, inventory, financial transactions, and daily operations from a single dashboard.'
+      tag: 'About the Software',
+      heading: 'Built for Your Shop, Your Way',
+      text: 'This software is designed specifically for your shop — whether you run a PCO, mobile shop, document center, or EasyPaisa/JazzCash service. It helps you manage customer records, documents, inventory, and daily transactions from one easy-to-use dashboard.'
     },
     features: {
       tag: 'Everything You Need',
-      heading: 'Everything You Need to Run Your Business',
+      heading: 'Everything You Need to Run Your Shop',
       items: [
         { icon: 'users', title: 'Customer Management', text: 'Store customer details, CNIC information, contact numbers, and complete service history.', color: '#eef2ff' },
         { icon: 'file-signature', title: 'Stamp Paper Management', text: 'Manage stamp paper records with document uploads, advanced search, and long-term storage.', color: '#fef3c7' },
         { icon: 'file-contract', title: 'Birth Certificate & Services', text: 'Track applications, monitor status, and manage service requests efficiently.', color: '#dbeafe' },
         { icon: 'mobile-alt', title: 'EasyPaisa & JazzCash', text: 'Record transactions, calculate commissions, and generate detailed reports.', color: '#d1fae5' },
         { icon: 'sim-card', title: 'Mobile Load Management', text: 'Track all network top-ups and recharge transactions with sales reports.', color: '#fce7f3' },
-        { icon: 'boxes', title: 'Inventory Management', text: 'Manage mobile phones, accessories, stock levels, purchases, sales, and profits.', color: '#e0e7ff' },
+        { icon: 'boxes', title: 'Inventory Management', text: 'Manage stock levels, purchases, sales, and track profits on phones and accessories.', color: '#e0e7ff' },
         { icon: 'wallet', title: 'Accounting System', text: 'Track income, expenses, cash flow, profits, and customer dues.', color: '#ffedd5' },
         { icon: 'chart-bar', title: 'Reports & Analytics', text: 'Generate daily, weekly, monthly, and yearly business reports.', color: '#ede9fe' }
       ]
     },
     whyChoose: {
       tag: 'Why Choose Us',
-      heading: 'Why Businesses Trust Our Software',
+      heading: 'Why Shop Owners Trust This Software',
       items: [
         { icon: 'bolt', title: 'Lightning Fast Search', text: 'Find any customer, document, or transaction in seconds.' },
-        { icon: 'shield-alt', title: 'Secure Data Storage', text: 'Keep records protected with automatic backups and secure access controls.' },
-        { icon: 'smile', title: 'Easy to Use', text: 'Simple interface designed for shop owners and staff.' },
+        { icon: 'shield-alt', title: 'Secure Data Storage', text: 'Keep your records protected with automatic backups and secure access.' },
+        { icon: 'smile', title: 'Easy to Use', text: 'Simple interface designed for shop owners — no technical skills needed.' },
         { icon: 'chart-line', title: 'Business Insights', text: 'Monitor sales, profits, expenses, and performance through detailed reports.' },
-        { icon: 'user-friends', title: 'Multi-User Support', text: 'Separate accounts and permissions for owners and employees.' },
+        { icon: 'dollar-sign', title: 'Save Time & Money', text: 'No more searching through papers or notebooks — everything is digital.' },
         { icon: 'database', title: 'Long-Term Record Keeping', text: 'Access records and documents even after 5-10 years.' }
       ]
     },
@@ -94,25 +94,25 @@ function getDefaultContent() {
     },
     testimonials: {
       tag: 'Testimonials',
-      heading: 'Trusted by Shop Owners',
+      heading: 'Trusted by Shop Owners Like You',
       items: [
-        { name: 'Ahmed R.', role: 'Shop Owner, Lahore', text: 'This software has completely changed how we manage customer records and stamp papers. Everything is organized and easy to find.', rating: 5 },
-        { name: 'Saima K.', role: 'Retailer, Karachi', text: 'We can now track EasyPaisa transactions, mobile loads, and inventory from one dashboard.', rating: 5 },
-        { name: 'Muhammad A.', role: 'PCO Operator, Islamabad', text: 'The search feature saves us hours every week. Finding old customer records is now effortless.', rating: 5 }
+        { name: 'Ahmed R.', role: 'Shop Owner, Lahore', text: 'This software has completely changed how I manage customer records and stamp papers. Everything is organized and easy to find.', rating: 5 },
+        { name: 'Saima K.', role: 'Retailer, Karachi', text: 'I can now track EasyPaisa transactions, mobile loads, and inventory from one dashboard. Highly recommended!', rating: 5 },
+        { name: 'Muhammad A.', role: 'PCO Operator, Islamabad', text: 'The search feature saves me hours every week. Finding old customer records is now effortless.', rating: 5 }
       ]
     },
     cta: {
-      heading: 'Ready to Digitize Your Business?',
-      text: 'Stop managing records manually. Upgrade to a complete business management system designed for PCOs, Mobile Shops, and Document Service Centers.',
-      button1_text: 'Request Free Demo',
+      heading: 'Ready to Organize Your Shop?',
+      text: 'Stop managing records manually. Switch to a complete shop management system designed to make your daily work easier and faster.',
+      button1_text: 'Get Started',
       button1_link: '#contact',
-      button2_text: 'Contact Sales',
+      button2_text: 'Contact Us',
       button2_link: '#contact'
     },
     contact: {
       tag: 'Get in Touch',
       heading: 'Contact Us',
-      text: 'Have questions about our software? Contact our team to schedule a demo, discuss your requirements, or get pricing information.',
+      text: 'Have questions about the software? Reach out to schedule a demo, discuss your requirements, or learn more about how it can help your shop.',
       phone: '+92 300 1234567',
       email: 'info@smz.com',
       address: 'Lahore, Pakistan'
