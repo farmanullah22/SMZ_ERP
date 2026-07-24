@@ -30,8 +30,6 @@ const WebsiteManage = {
       { id: 'about', icon: 'info-circle', label: 'About' },
       { id: 'features', icon: 'list', label: 'Features' },
       { id: 'whyChoose', icon: 'star', label: 'Why Choose' },
-      { id: 'process', icon: 'steps', label: 'Process' },
-      { id: 'testimonials', icon: 'comment-dots', label: 'Testimonials' },
       { id: 'cta', icon: 'bullhorn', label: 'CTA' },
       { id: 'contact', icon: 'envelope', label: 'Contact' },
       { id: 'site', icon: 'cog', label: 'Site Settings' },
@@ -74,13 +72,11 @@ const WebsiteManage = {
   renderTabContent() {
     const ct = document.getElementById('websiteTabContent');
     switch (this.currentTab) {
-      case 'hero': this.renderSectionForm(ct, 'hero', ['badge', 'heading', 'subheading', 'description', 'button1_text', 'button1_link', 'button2_text', 'button2_link', { key: 'stats', type: 'array', fields: ['number', 'label'] }]); break;
+      case 'hero': this.renderSectionForm(ct, 'hero', ['badge', 'heading', 'subheading', 'description', 'button1_text', 'button1_link', 'button2_text', 'button2_link']); break;
       case 'stampSearch': this.renderSectionForm(ct, 'stampSearch', ['heading', 'description', 'placeholder', 'button_text', 'hint']); break;
       case 'about': this.renderSectionForm(ct, 'about', ['tag', 'heading', 'text']); break;
       case 'features': this.renderSectionForm(ct, 'features', ['tag', 'heading', { key: 'items', type: 'array', fields: ['icon', 'title', 'text', 'color'] }]); break;
       case 'whyChoose': this.renderSectionForm(ct, 'whyChoose', ['tag', 'heading', { key: 'items', type: 'array', fields: ['icon', 'title', 'text'] }]); break;
-      case 'process': this.renderSectionForm(ct, 'process', ['tag', 'heading', { key: 'steps', type: 'array', fields: ['number', 'title', 'text'] }]); break;
-      case 'testimonials': this.renderSectionForm(ct, 'testimonials', ['tag', 'heading', { key: 'items', type: 'array', fields: ['name', 'role', 'text', 'rating'] }]); break;
       case 'cta': this.renderSectionForm(ct, 'cta', ['heading', 'text', 'button1_text', 'button1_link', 'button2_text', 'button2_link']); break;
       case 'contact': this.renderSectionForm(ct, 'contact', ['tag', 'heading', 'text', 'phone', 'email', 'address']); break;
       case 'site': this.renderSiteSettings(ct); break;

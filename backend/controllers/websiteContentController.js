@@ -76,25 +76,6 @@ function getDefaultContent() {
         { icon: 'database', title: 'Long-Term Record Keeping', text: 'Access records and documents even after 5-10 years.' }
       ]
     },
-    process: {
-      tag: 'Simple Process',
-      heading: 'How It Works',
-      steps: [
-        { number: 1, title: 'Create Customer Record', text: 'Add customer information and service details.' },
-        { number: 2, title: 'Upload Documents', text: 'Attach PDFs, scanned copies, images, and certificates.' },
-        { number: 3, title: 'Manage Transactions', text: 'Record payments, services, sales, and financial activities.' },
-        { number: 4, title: 'Search Anytime', text: 'Retrieve records instantly whenever needed.' }
-      ]
-    },
-    testimonials: {
-      tag: 'Testimonials',
-      heading: 'Trusted by Shop Owners Like You',
-      items: [
-        { name: 'Ahmed R.', role: 'Shop Owner, Lahore', text: 'This software has completely changed how I manage customer records and stamp papers. Everything is organized and easy to find.', rating: 5 },
-        { name: 'Saima K.', role: 'Retailer, Karachi', text: 'I can now track EasyPaisa transactions, mobile loads, and inventory from one dashboard. Highly recommended!', rating: 5 },
-        { name: 'Muhammad A.', role: 'PCO Operator, Islamabad', text: 'The search feature saves me hours every week. Finding old customer records is now effortless.', rating: 5 }
-      ]
-    },
     cta: {
       heading: 'Ready to Organize Your Shop?',
       text: 'Stop managing records manually. Switch to a complete shop management system designed to make your daily work easier and faster.',
@@ -128,7 +109,7 @@ const getManageContent = async (req, res) => {
 const updateSection = async (req, res) => {
   try {
     const { section } = req.params;
-    const allowedSections = ['site', 'hero', 'stampSearch', 'about', 'features', 'whyChoose', 'process', 'testimonials', 'cta', 'contact', 'heroSlider'];
+    const allowedSections = ['site', 'hero', 'stampSearch', 'about', 'features', 'whyChoose', 'cta', 'contact', 'heroSlider'];
     if (!allowedSections.includes(section)) {
       return res.status(400).json({ error: 'Invalid section' });
     }
