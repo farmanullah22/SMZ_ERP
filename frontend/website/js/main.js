@@ -83,7 +83,8 @@ const Website = {
           ${hasSlider ? `
           <div class="hero-slider" id="heroSlider">
             ${sliderImages.map((img, i) => `
-              <div class="hero-slide${i === 0 ? ' active' : ''}" style="background-image:url('${img}');" data-index="${i}">
+              <div class="hero-slide${i === 0 ? ' active' : ''}" data-index="${i}">
+                <img src="${img}" alt="Slide ${i + 1}" class="hero-slide-img">
                 <div class="hero-slide-overlay"></div>
               </div>
             `).join('')}
