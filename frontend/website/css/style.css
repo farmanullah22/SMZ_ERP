@@ -994,6 +994,7 @@ a { text-decoration: none; color: inherit; }
   /* Hero */
   .hero { padding-top: 100px; min-height: 50vh; display: block; }
   .hero-with-slider { min-height: 50vh; display: block; }
+  .hero-slide-img { object-fit: contain; object-position: center center; margin-top: 0; }
   .hero-title { font-size: 30px; }
   .hero-subtitle { font-size: 16px; }
   .hero-content { padding: 40px 0 30px; }
