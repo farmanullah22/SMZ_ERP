@@ -275,6 +275,14 @@ body {
   text-decoration: none;
 }
 
+.logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
 .logo i {
   font-size: 28px;
   background: linear-gradient(135deg, var(--primary), #8b5cf6);

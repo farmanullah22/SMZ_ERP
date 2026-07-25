@@ -50,7 +50,7 @@ const Website = {
       <nav class="navbar" id="navbar">
         <div class="container">
           <a href="/website/" class="navbar-logo">
-            <div class="logo-icon">${(st.site_name || 'SMZ').substring(0,3)}</div>
+            <img src="../public/logo.png" alt="${st.site_name || 'SMZ'}" class="logo-img">
           </a>
           <div class="nav-links" id="navLinks">
             <a href="#home" class="nav-link active">Home</a>
@@ -66,7 +66,7 @@ const Website = {
       <div class="drawer-overlay hidden" id="drawerOverlay"></div>
       <div class="drawer hidden" id="drawer">
         <div class="drawer-header">
-          <div class="logo-icon" style="width:36px;height:36px;font-size:14px;">${(st.site_name || 'SMZ').substring(0,3)}</div>
+          <img src="../public/logo.png" alt="${st.site_name || 'SMZ'}" class="logo-img" style="width:36px;height:36px;">
           <button id="drawerClose"><i class="fas fa-times"></i></button>
         </div>
         <div class="drawer-links">
@@ -204,7 +204,7 @@ const Website = {
         <div class="container">
           <div class="footer-content">
             <div class="footer-brand">
-              <div class="logo-icon" style="width:48px;height:48px;font-size:18px;">${(st.site_name || 'SMZ').substring(0,3)}</div>
+              <img src="../public/logo.png" alt="${st.site_name || 'SMZ'}" class="logo-img" style="width:48px;height:48px;">
               <p>${(st.site_name || 'SMZ ERP')} — Complete business management software for PCOs, Mobile Shops, and Document Service Centers.</p>
             </div>
             <div class="footer-links">
