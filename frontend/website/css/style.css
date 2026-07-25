@@ -397,8 +397,10 @@ a { text-decoration: none; color: inherit; }
 .hero-slide-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center top;
   margin-top: 40px;
+  max-width: none;
 }
 .hero-slide-overlay {
   position: absolute;
